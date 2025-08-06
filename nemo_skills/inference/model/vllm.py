@@ -13,12 +13,6 @@
 # limitations under the License.
 
 import logging
-import math
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-import openai
-import requests
-from openai import BadRequestError
 
 from nemo_skills.utils import get_logger_name
 
@@ -118,5 +112,3 @@ class VLLMModel(BaseModel):
             "tools": tools,
         }
         return request
-
-

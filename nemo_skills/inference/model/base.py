@@ -152,7 +152,6 @@ class BaseModel:
             'timeout': timeout,
             'reasoning_effort': reasoning_effort,
             'tools': tools,
-            'skip_special_tokens': False,
             'extra_body': extra_body,
         }
         if isinstance(prompt, list):
@@ -213,7 +212,6 @@ class BaseModel:
             'timeout': timeout,
             'reasoning_effort': reasoning_effort,
             'tools': tools,
-            'skip_special_tokens': False,
             'extra_body': extra_body,
         }
 
