@@ -18,6 +18,7 @@ import os
 
 import httpx
 import litellm
+import openai
 
 from nemo_skills.utils import get_logger_name
 
@@ -154,26 +155,42 @@ class BaseModel:
             'tools': tools,
             'extra_body': extra_body,
         }
-        if isinstance(prompt, list):
-            request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
-            response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
-            if stream:
-                result = self._stream_chat_chunks_async(response)
-            else:
-                result = self._parse_chat_completion_response(response, include_response=include_response, **kwargs)
 
-        elif isinstance(prompt, str):
-            request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
-            response = await litellm.atext_completion(**request_params, **self.litellm_kwargs)
-            if stream:
-                result = self._stream_completion_chunks_async(response)
-            else:
-                result = self._parse_completion_response(response, include_response=include_response, **kwargs)
-        else:
-            raise TypeError(f"Unsupported prompt type: {type(prompt)}")
+        max_retries = 10
+        retry_count = 0
 
-        self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
-        return result
+        while retry_count <= max_retries:
+            try:
+                if isinstance(prompt, list):
+                    request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
+                    response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
+                    if stream:
+                        result = self._stream_chat_chunks_async(response)
+                    else:
+                        result = self._parse_chat_completion_response(
+                            response, include_response=include_response, **kwargs
+                        )
+
+                elif isinstance(prompt, str):
+                    request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
+                    response = await litellm.atext_completion(**request_params, **self.litellm_kwargs)
+                    if stream:
+                        result = self._stream_completion_chunks_async(response)
+                    else:
+                        result = self._parse_completion_response(response, include_response=include_response, **kwargs)
+                else:
+                    raise TypeError(f"Unsupported prompt type: {type(prompt)}")
+
+                self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
+                return result
+
+            except openai.BadRequestError as e:
+                if "output messages (reasoning and final)" in str(e) and retry_count < max_retries:
+                    retry_count += 1
+                    LOG.warning(f"BadRequestError, retrying {retry_count}/{max_retries}: {e}")
+                    continue
+                else:
+                    raise
 
     def generate_sync(
         self,
