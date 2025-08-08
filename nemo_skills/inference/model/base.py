@@ -173,6 +173,7 @@ class BaseModel:
 
                 elif isinstance(prompt, str):
                     request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
+                    request_params['skip_special_tokens'] = False
                     response = await litellm.atext_completion(**request_params, **self.litellm_kwargs)
                     if stream:
                         result = self._stream_completion_chunks_async(response)
@@ -243,6 +244,7 @@ class BaseModel:
 
         elif isinstance(prompt, str):
             request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
+            request_params['skip_special_tokens'] = False
             response = litellm.text_completion(**request_params, **self.litellm_kwargs)
             if stream:
                 result = self._stream_completion_chunks_sync(response)
