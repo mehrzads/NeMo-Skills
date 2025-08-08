@@ -16,8 +16,8 @@
 code_begin: "<|start|>assistant<|channel|>analysis to=python code<|message|>"
 code_end: "<|call|>"
 # used to extract the code output
-code_output_begin: "_output<|message|>"
-code_output_end: "<|call|>_output<|message|>"
+code_output_begin: "<|start|>python code to=assistant<|channel|>analysis<|message|>"
+code_output_end: "<|end|><|start|>assistant"
 # used to post-process code output
 # choices: llama, qwen
 code_output_format: "qwen"
