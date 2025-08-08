@@ -70,6 +70,7 @@ class VLLMModel(BaseModel):
             "logprobs": top_logprobs,
             "stream": stream,
             "echo": False,
+            "skip_special_tokens": False,
             "n": 1,
             "logit_bias": None,
             "frequency_penalty": 0.0,
