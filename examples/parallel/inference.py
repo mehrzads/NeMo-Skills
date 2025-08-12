@@ -2,9 +2,8 @@ from pydantic import BaseModel
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
 from nemo_skills.inference.parallel.parallelgen import ParallelGenTask, ParallelGenConfig
 
-cluster = 'oci-ord-mz'
-tokens_to_generate = 32768
-num_solutions = 16
+
+
    
 class MainConfig(BaseModel):
     model_name: str
@@ -16,7 +15,7 @@ class MainConfig(BaseModel):
     inference_temperature: float
     generation_type: str
     num_generations: int
-
+    cluster: str    
 def main(config: MainConfig):
    
    
@@ -25,6 +24,7 @@ def main(config: MainConfig):
         " ++inference.tokens_to_generate={TOKENS_TO_GENERATE} "     
         " ++prompt_config={PROMPT_CONFIG} "
         " ++prompt_template={PROMPT_TEMPLATE} "
+        " ++num_generations={NUM_GENERATIONS} "
     )
 
     # Configure server settings based on model_name
@@ -64,13 +64,14 @@ def main(config: MainConfig):
         "TOKENS_TO_GENERATE": config.tokens_to_generate,    
         "PROMPT_CONFIG": config.prompt_config,
         "PROMPT_TEMPLATE": prompt_template,
+        "NUM_GENERATIONS": config.num_generations,
     }
      # Check if output_dir is provided in config, otherwise construct it
     if not config.output_dir:
         raise ValueError("output_dir must be provided")
 
 
-    expname = f"livecodebench_inference"
+    expname = f"ioi_inference"
 
     
     expname = expname.format(**format_dict)
@@ -83,7 +84,7 @@ def main(config: MainConfig):
     generate(
         ctx=ctx,
         generation_type=config.generation_type,
-        cluster=cluster,
+        cluster=config.cluster,
         input_file=config.input_file,
         output_dir=config.output_dir,
         expname=expname,
@@ -121,6 +122,8 @@ if __name__ == "__main__":
                         help="Generation mode")
     parser.add_argument("--num_generations", type=int, default=10,
                         help="Number of generations")
+    parser.add_argument("--cluster", type=str, default="oci-ord-mz-1",
+                        help="Cluster to use")
    
     args, unknown = parser.parse_known_args()
 
@@ -134,5 +137,6 @@ if __name__ == "__main__":
         inference_temperature=args.inference_temperature,        
         generation_type=args.generation_type,
         num_generations=args.num_generations,
+        cluster=args.cluster,
     )
     main(main_config_instance)
