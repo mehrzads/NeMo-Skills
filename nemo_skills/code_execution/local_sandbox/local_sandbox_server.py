@@ -196,6 +196,54 @@ def execute_shell(command, timeout):
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
 
+def execute_cpp(generated_code, timeout):
+    src_file = None
+    bin_file = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".cpp", mode="w") as f:
+            f.write(generated_code)
+            src_file = f.name
+        bin_file = src_file + ".out"
+
+        compile_cmd = ["g++", "-std=c++17", src_file, "-o", bin_file]
+        compile_proc = subprocess.run(
+            compile_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+            preexec_fn=set_limits,
+        )
+        if compile_proc.returncode != 0:
+            return {"process_status": "compile_error", "stdout": compile_proc.stdout, "stderr": compile_proc.stderr}
+
+        run_proc = subprocess.Popen(
+            [bin_file],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            preexec_fn=set_limits,
+        )
+        try:
+            stdout, stderr = run_proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            kill_process_tree(run_proc)
+            stdout, stderr = run_proc.communicate()
+            return {"process_status": "timeout", "stdout": stdout.decode() if isinstance(stdout, bytes) else stdout, "stderr": (stderr.decode() if isinstance(stderr, bytes) else stderr) + "Timed out\n"}
+
+        status = "completed" if run_proc.returncode == 0 else "failed"
+        return {"process_status": status, "stdout": stdout.decode() if isinstance(stdout, bytes) else stdout, "stderr": stderr.decode() if isinstance(stderr, bytes) else stderr}
+    except subprocess.TimeoutExpired:
+        return {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+    except Exception as e:
+        return {"process_status": "error", "stdout": "", "stderr": str(e) + "\n"}
+    finally:
+        for path in (src_file, bin_file):
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
+
 
 # need to memory-limit to avoid common errors of allocating too much
 # but this has to be done in a subprocess to not crush server itself
@@ -226,6 +274,8 @@ def execute():
         return execute_lean4(generated_code, timeout)
     elif language == 'shell':
         return execute_shell(generated_code, timeout)
+    elif language in ('cpp', 'c++', 'cpp17', 'c++17'):
+        return execute_cpp(generated_code, timeout)
     else:
         return execute_python(generated_code, std_input, timeout, language)
 
