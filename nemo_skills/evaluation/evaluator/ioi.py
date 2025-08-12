@@ -15,6 +15,7 @@ import json
 import multiprocessing
 import os
 import re
+import asyncio
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
 from nemo_skills.file_utils import jdump
@@ -88,13 +89,13 @@ _EOT_
 """)
 
         setup_script = "\n".join(file_creation_commands)
-        setup_result, _ = worker_sandbox.execute_code(setup_script, language='shell')
+        setup_result, _ = asyncio.run(worker_sandbox.execute_code(setup_script, language='shell'))
         if setup_result.get('stderr'):
             raise Exception(f"File setup failed: {setup_result['stderr']}")
 
         # 2. Compile the code
         compile_command = f"cd {unique_dir} && ./compile.sh"
-        compile_result, _ = worker_sandbox.execute_code(compile_command, language='shell')
+        compile_result, _ = asyncio.run(worker_sandbox.execute_code(compile_command, language='shell'))
 
         result = {
             "compile_success": not compile_result.get('stderr'),
@@ -110,7 +111,7 @@ _EOT_
 
         # 3. Run the code
         run_command = f"cd {unique_dir} && ./run.sh"
-        run_result, _ = worker_sandbox.execute_code(run_command, language='shell')
+        run_result, _ = asyncio.run(worker_sandbox.execute_code(run_command, language='shell'))
 
         run_stdout = run_result.get('stdout', '')
         run_stderr = run_result.get('stderr', '')
@@ -134,7 +135,7 @@ _EOT_
         # 4. Clean up the directory
         # Fire and forget; ignore return values
         try:
-            worker_sandbox.execute_code(f"rm -rf {unique_dir}", language='shell')
+            asyncio.run(worker_sandbox.execute_code(f"rm -rf {unique_dir}", language='shell'))
         except Exception:
             pass
 
