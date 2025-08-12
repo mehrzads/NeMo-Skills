@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
-from nemo_skills.inference.parallel.parallelgen import ParallelGenTask, ParallelGenConfig
+from nemo_skills.inference.parallelgen import ParallelGenTask, ParallelGenConfig
 
 
 
