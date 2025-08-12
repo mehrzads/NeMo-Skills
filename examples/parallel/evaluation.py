@@ -44,7 +44,7 @@ def main( code_input_file: str,  cluster: str):
     base_code_expname = code_input_file.name
     print(f"Using base name '{base_code_expname}' derived from path for job/file naming.")
 
-    eval_args = "++eval_type=ioi ++eval_config.dataset=ioi ++eval_config.test_file=/workspace/llmcoding/eval_datasets/ioi/test_metadata.json"
+    eval_args = "++eval_type=ioi ++eval_config.dataset=ioi ++eval_config.test_file=/workspace/llmcoding/eval_dataset/ioi/test_metadata.json"
    
     print(f"\n--- Processing Evaluation for Run ---")
 
