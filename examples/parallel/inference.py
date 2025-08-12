@@ -25,6 +25,11 @@ def main(config: MainConfig):
         " ++prompt_config={PROMPT_CONFIG} "
         " ++prompt_template={PROMPT_TEMPLATE} "
         " ++num_generations={NUM_GENERATIONS} "
+        " ++skip_filled=True "        
+    )
+    extra_overrides = (
+        " ++inference.top_p=1.0 "
+        " ++max_concurrent_requests=1024 "
     )
 
     # Configure server settings based on model_name
@@ -35,7 +40,6 @@ def main(config: MainConfig):
         server_nodes = 2
         server_gpus = 8
         server_args = "--load-format sharded_state --tensor-parallel-size=16" # Aligned with evaluation.py
-        batch_size = 16
     elif config.model_name == "Qwen3-235B-A22B-Thinking-2507-tp16-sglang":
         # SGLang server settings
         prompt_template = "qwen-instruct"
@@ -43,7 +47,15 @@ def main(config: MainConfig):
         server_nodes = 2
         server_gpus = 8
         server_args = "--load-format sharded_state --tensor-parallel-size=16" # Aligned with evaluation.py
-        batch_size = 16
+
+    elif config.model_name == "gpt-oss-120b":
+        # vLLM server settings
+        prompt_template = "gpt-oss-high"
+        server_type = 'vllm'
+        server_nodes = 1
+        server_gpus = 8
+        server_args = "--async-scheduling --max-num-seqs=1024" # Aligned with evaluation.py
+        current_overrides += extra_overrides
     else:
         # vLLM server settings
         prompt_template = "qwen-instruct"
@@ -51,7 +63,7 @@ def main(config: MainConfig):
         server_nodes = 1
         server_gpus = 8
         server_args = "--tensor-parallel-size=8" # Aligned with evaluation.py
-        batch_size = 128
+
     
     if config.model_name == "aleks":
         model_path = f"/workspace/hf_models/{config.model_name}" # Access via config object
@@ -80,24 +92,40 @@ def main(config: MainConfig):
 
  
 
-
-    generate(
-        ctx=ctx,
-        generation_type=config.generation_type,
-        cluster=config.cluster,
-        input_file=config.input_file,
-        output_dir=config.output_dir,
-        expname=expname,
-        model=model_path,
-        server_type=server_type,
-        server_gpus=server_gpus,
-        server_nodes=server_nodes,
-        num_random_seeds=1,
-        time_min="01:00:00",
-        # set these according to your cluster configuration
-        # num_chunks=N,
-        # dependent_jobs=M,
-    )
+    if config.model_name == "gpt-oss-120b":
+        generate(
+            ctx=ctx,
+            generation_type=config.generation_type,
+            cluster=config.cluster,
+            input_file=config.input_file,
+            output_dir=config.output_dir,
+            expname=expname,
+            model=model_path,
+            server_type=server_type,
+            server_gpus=server_gpus,
+            server_nodes=server_nodes,
+            num_random_seeds=1,
+            time_min="01:00:00",
+            with_sandbox=True,
+        )
+    else:
+         generate(
+            ctx=ctx,
+            generation_type=config.generation_type,
+            cluster=config.cluster,
+            input_file=config.input_file,
+            output_dir=config.output_dir,
+            expname=expname,
+            model=model_path,
+            server_type=server_type,
+            server_gpus=server_gpus,
+            server_nodes=server_nodes,
+            num_random_seeds=1,
+            time_min="01:00:00",
+            # set these according to your cluster configuration
+            # num_chunks=N,
+            # dependent_jobs=M,
+        )
 
 
 if __name__ == "__main__":
