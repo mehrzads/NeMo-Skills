@@ -105,7 +105,7 @@ if __name__ == "__main__":
     # Get run_num from arguments
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--prompt_config", type=str, default="generic/codegen",
+    parser.add_argument("--prompt_config", type=str, default="eval/ioi/codegen",
                         help="Prompt configuration to use")
     parser.add_argument("--model_name", type=str, default="Qwen3-8B",
                         help="Model name")
@@ -113,7 +113,7 @@ if __name__ == "__main__":
                         help="Temperature for inference")
     parser.add_argument("--tokens_to_generate", type=int, default=32768,
                         help="Number of tokens to generate")
-    parser.add_argument("--input_file", type=str, default="/workspace/llmcoding/eval_dataset/livecodebench/problems/3485.jsonl",
+    parser.add_argument("--input_file", type=str, default="/workspace/llmcoding/eval_dataset/ioi/problems/1.jsonl",
                         help="Input file (used in genselect_generation mode)")
     parser.add_argument("--output_dir", type=str, default="/workspace/test/",
                         help="Output directory")
