@@ -15,23 +15,14 @@
 from nemo_skills.utils import python_doc_to_cmd_help
 
 from .azure import AzureOpenAIModel
-
-# Base classes
 from .base import BaseModel
-
-# Code execution
 from .code_execution import CodeExecutionConfig, CodeExecutionWrapper
 from .megatron import MegatronModel
 
 # Online GenSelect
 from .online_genselect import OnlineGenSelectConfig, OnlineGenSelectWrapper
 from .openai import OpenAIModel
-
-# Utilities
 from .vllm import VLLMModel
-
-# Model implementations
-
 
 # Model registry
 models = {

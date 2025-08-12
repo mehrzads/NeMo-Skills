@@ -255,7 +255,7 @@ def wrap_cmd(cmd, preprocess_cmd, postprocess_cmd, random_seed=None, wandb_param
         cmd = f" {preprocess_cmd} && {cmd} "
     if postprocess_cmd:
         if random_seed is not None:
-            postprocess_cmd = postprocess_cmd.format(random_seed=random_seed)
+               postprocess_cmd = postprocess_cmd.replace("{random_seed}", str(random_seed))
         cmd = f" {cmd} && {postprocess_cmd} "
     if wandb_parameters:
         log_wandb_cmd = (
