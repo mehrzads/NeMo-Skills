@@ -93,7 +93,7 @@ def main(config: MainConfig):
         server_gpus=server_gpus,
         server_nodes=server_nodes,
         num_random_seeds=1,
-        time_min="00:10:00",
+        time_min="01:00:00",
         # set these according to your cluster configuration
         # num_chunks=N,
         # dependent_jobs=M,
