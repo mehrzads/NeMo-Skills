@@ -34,6 +34,13 @@ class IOIEvaluatorConfig:
 def init_worker(sandbox_arg):
     global worker_sandbox
     worker_sandbox = sandbox_arg
+    # Create and set a dedicated event loop for this worker process.  
+    # Re-using the same loop for all subsequent sandbox calls avoids the
+    # "Event loop is closed" error that occurs when each call spins up
+    # and closes its own loop (as happens with asyncio.run).
+    global worker_loop
+    worker_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(worker_loop)
 
 
 def run_test_case(task_args: dict, worker_id: int) -> dict:
@@ -89,13 +96,17 @@ _EOT_
 """)
 
         setup_script = "\n".join(file_creation_commands)
-        setup_result, _ = asyncio.run(worker_sandbox.execute_code(setup_script, language='shell'))
+        setup_result, _ = worker_loop.run_until_complete(
+            worker_sandbox.execute_code(setup_script, language='shell')
+        )
         if setup_result.get('stderr'):
             raise Exception(f"File setup failed: {setup_result['stderr']}")
 
         # 2. Compile the code
         compile_command = f"cd {unique_dir} && ./compile.sh"
-        compile_result, _ = asyncio.run(worker_sandbox.execute_code(compile_command, language='shell'))
+        compile_result, _ = worker_loop.run_until_complete(
+            worker_sandbox.execute_code(compile_command, language='shell')
+        )
 
         result = {
             "compile_success": not compile_result.get('stderr'),
@@ -111,7 +122,9 @@ _EOT_
 
         # 3. Run the code
         run_command = f"cd {unique_dir} && ./run.sh"
-        run_result, _ = asyncio.run(worker_sandbox.execute_code(run_command, language='shell'))
+        run_result, _ = worker_loop.run_until_complete(
+            worker_sandbox.execute_code(run_command, language='shell')
+        )
 
         run_stdout = run_result.get('stdout', '')
         run_stderr = run_result.get('stderr', '')
@@ -135,7 +148,9 @@ _EOT_
         # 4. Clean up the directory
         # Fire and forget; ignore return values
         try:
-            asyncio.run(worker_sandbox.execute_code(f"rm -rf {unique_dir}", language='shell'))
+            worker_loop.run_until_complete(
+                worker_sandbox.execute_code(f"rm -rf {unique_dir}", language='shell')
+            )
         except Exception:
             pass
 
