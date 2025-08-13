@@ -225,6 +225,7 @@ def eval_ioi(cfg):
 
                 scores = []
                 for i in range(0, len(test_items), batch_size):
+                    print(f"Batch: {i}")
                     batch = test_items[i:i + batch_size]
                     tasks = []
                     for local_idx, (test_name, test_data) in enumerate(batch):
