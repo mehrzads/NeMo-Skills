@@ -72,6 +72,7 @@ def main( code_input_file: str,  cluster: str):
         expname=eval_job_expname,
         log_dir=str(eval_log_dir),
         num_nodes=server_nodes,
+        num_gpus=server_gpus,
         with_sandbox=True,
         time_min=merge_time_min,
     )
