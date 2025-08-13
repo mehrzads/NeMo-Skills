@@ -240,7 +240,7 @@ def eval_ioi(cfg):
                         }
                         tasks.append((task_args, local_idx))
                     results = pool.starmap(run_test_case, tasks)
-
+                    print(f"Results: {results}")
                     for (test_name, _), result in zip(batch, results):
                         result_with_name = dict(result)
                         result_with_name['test_name'] = test_name
