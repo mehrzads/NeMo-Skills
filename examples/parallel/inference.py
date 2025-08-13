@@ -101,12 +101,11 @@ def main(config: MainConfig):
             input_file=config.input_file,
             output_dir=config.output_dir,
             expname=expname,
-            model=model_path,
-            random_seeds = list(range(0, config.num_runs)),
+            model=model_path,            
             server_type=server_type,
             server_gpus=server_gpus,
             server_nodes=server_nodes,
-            num_random_seeds=1,
+            num_random_seeds=config.num_runs,
             time_min="04:00:00",
             with_sandbox=True,
         )
@@ -122,7 +121,7 @@ def main(config: MainConfig):
             server_type=server_type,
             server_gpus=server_gpus,
             server_nodes=server_nodes,
-            num_random_seeds=1,
+            num_random_seeds=config.num_runs,
             time_min="04:00:00",
             # set these according to your cluster configuration
             # num_chunks=N,
