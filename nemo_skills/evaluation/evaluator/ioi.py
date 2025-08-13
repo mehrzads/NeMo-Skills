@@ -215,6 +215,7 @@ def eval_ioi(cfg):
             problem_name = entry['name']
             problem_metadata = metadata[problem_name]
             for subtask, subtask_data in problem_metadata.items():
+                print(f"Subtask: {subtask}")
                 tests = subtask_data['tests']
                 subtask_score = subtask_data['score']
                 subtask_score_precision = subtask_data['score_precision']
