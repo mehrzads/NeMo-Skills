@@ -47,7 +47,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
     global worker_sandbox
 
     unique_dir = f"/tmp/ioi_run_{worker_id}_{os.getpid()}"
-
+    print(f"running test case in {unique_dir} for worker {worker_id}")
     try:
         # 1. Create all necessary files in one batch command
         grader_files = task_args.get("grader_files", [])
@@ -96,18 +96,19 @@ _EOT_
 """)
 
         setup_script = "\n".join(file_creation_commands)
+        print(f"Setup script: {setup_script}")
         setup_result, _ = worker_loop.run_until_complete(
             worker_sandbox.execute_code(setup_script, language='shell')
         )
         if setup_result.get('stderr'):
             raise Exception(f"File setup failed: {setup_result['stderr']}")
-
+        print(f"Setup result: {setup_result}")
         # 2. Compile the code
         compile_command = f"cd {unique_dir} && ./compile.sh"
         compile_result, _ = worker_loop.run_until_complete(
             worker_sandbox.execute_code(compile_command, language='shell')
         )
-
+        print(f"Compile result: {compile_result}")
         result = {
             "compile_success": not compile_result.get('stderr'),
             "compile_stdout": compile_result.get('stdout', ''),
@@ -125,7 +126,7 @@ _EOT_
         run_result, _ = worker_loop.run_until_complete(
             worker_sandbox.execute_code(run_command, language='shell')
         )
-
+        print(f"Run result: {run_result}")
         run_stdout = run_result.get('stdout', '')
         run_stderr = run_result.get('stderr', '')
 
@@ -239,6 +240,7 @@ def eval_ioi(cfg):
                             "test_output": test_data['output']
                         }
                         tasks.append((task_args, local_idx))
+                    print(f"Tasks: {tasks}")
                     results = pool.starmap(run_test_case, tasks)
                     print(f"Results: {results}")
                     for (test_name, _), result in zip(batch, results):
