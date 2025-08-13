@@ -210,7 +210,7 @@ def eval_ioi(cfg):
             print(f"Evaluating {x}/{len(samples)}")
             completion = extract_final_cpp_block(entry['generation'])
             completion = add_includes(completion, entry['ioi_id'])
-
+            print(f"Completion: {completion}")
             test_case_results = {}
             problem_name = entry['name']
             problem_metadata = metadata[problem_name]
