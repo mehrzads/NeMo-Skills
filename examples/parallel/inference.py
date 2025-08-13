@@ -16,6 +16,7 @@ class MainConfig(BaseModel):
     generation_type: str
     num_generations: int
     cluster: str    
+    num_runs: int
 def main(config: MainConfig):
    
    
@@ -101,11 +102,12 @@ def main(config: MainConfig):
             output_dir=config.output_dir,
             expname=expname,
             model=model_path,
+            random_seeds = list(range(0, config.num_runs)),
             server_type=server_type,
             server_gpus=server_gpus,
             server_nodes=server_nodes,
             num_random_seeds=1,
-            time_min="01:00:00",
+            time_min="04:00:00",
             with_sandbox=True,
         )
     else:
@@ -121,7 +123,7 @@ def main(config: MainConfig):
             server_gpus=server_gpus,
             server_nodes=server_nodes,
             num_random_seeds=1,
-            time_min="01:00:00",
+            time_min="04:00:00",
             # set these according to your cluster configuration
             # num_chunks=N,
             # dependent_jobs=M,
@@ -152,7 +154,8 @@ if __name__ == "__main__":
                         help="Number of generations")
     parser.add_argument("--cluster", type=str, default="oci-ord-mz-1",
                         help="Cluster to use")
-   
+    parser.add_argument("--num_runs", type=int, default=1,
+                        help="Number of runs")
     args, unknown = parser.parse_known_args()
 
     main_config_instance = MainConfig(
@@ -166,5 +169,6 @@ if __name__ == "__main__":
         generation_type=args.generation_type,
         num_generations=args.num_generations,
         cluster=args.cluster,
+        num_runs=args.num_runs,
     )
     main(main_config_instance)
