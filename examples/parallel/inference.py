@@ -106,7 +106,7 @@ def main(config: MainConfig):
             server_gpus=server_gpus,
             server_nodes=server_nodes,
             num_random_seeds=config.num_runs,
-            time_min="00:20:00",
+            time_min="04:00:00",
             with_sandbox=True,
         )
     else:
@@ -122,7 +122,7 @@ def main(config: MainConfig):
             server_gpus=server_gpus,
             server_nodes=server_nodes,
             num_random_seeds=config.num_runs,
-            time_min="00:20:00",
+            time_min="04:00:00",
             # set these according to your cluster configuration
             # num_chunks=N,
             # dependent_jobs=M,
