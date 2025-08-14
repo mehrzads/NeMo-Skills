@@ -21,8 +21,9 @@ from pathlib import Path
 from typing import List, Dict
 import re # Keep re import
 import argparse # Import argparse
-
 from nemo_skills.pipeline.cli import wrap_arguments, run_cmd
+from nemo_skills.pipeline.eval import eval
+
 
 
 
@@ -31,7 +32,7 @@ codegen_root = "/nemo_run/code/"
 # Server settings for merge job (can be minimal if merge.py is lightweight)
 server_nodes = 1
 server_gpus = 1 # merge.py is likely CPU-bound
-merge_time_min = '00:10:00' # Adjust as needed for merge.py runtime
+merge_time_min = '04:00:00' # Adjust as needed for merge.py runtime
 
 def main( code_input_file: str,  cluster: str):            
     print(f"Code input file provided: {code_input_file}")
@@ -64,17 +65,42 @@ def main( code_input_file: str,  cluster: str):
     )
     
     
-
-    run_cmd(
-        ctx=wrap_arguments(""), # No hydra overrides needed for this simple script dispatch
+#
+ #   run_cmd(
+ #       ctx=wrap_arguments(""), # No hydra overrides needed for this simple script dispatch
+ #       cluster=cluster,
+ #       command=eval_command,
+ #       expname=eval_job_expname,
+ #       log_dir=str(eval_log_dir),
+ #       num_nodes=server_nodes,
+ #       num_gpus=server_gpus,
+ #       with_sandbox=True,
+ #       time_min=merge_time_min,
+ #   )
+    eval(
+        ctx=wrap_arguments(
+                "++inference.tokens_to_generate=120000 "
+                "++inference.temperature=1.0 "
+                "++inference.top_p=1.0 "
+                "++max_concurrent_requests=1024 "
+                "++prompt_config=gpt-oss/code-sean "
+                "++prompt_template=gpt-oss-high "  
+                "++skip_filled=True "            
+            ), # No hydra overrides needed for this simple script dispatch
         cluster=cluster,
-        command=eval_command,
-        expname=eval_job_expname,
-        log_dir=str(eval_log_dir),
-        num_nodes=server_nodes,
-        num_gpus=server_gpus,
+        benchmarks="ioi24:1",
+        extra_eval_args=eval_args,
+        split="test",
         with_sandbox=True,
-        time_min=merge_time_min,
+        expname="oss_ioi_full",
+        model="/hf_models/gpt-oss-120b",
+        server_type="vllm",
+        server_gpus=8,
+        server_nodes=1,
+        server_args="--async-scheduling --max-num-seqs=1024",
+        data_dir="/workspace/llmcoding/eval_dataset/",
+        output_dir="/workspace/test/",
+        time_min=merge_time_min,               
     )
     print(f"--- Submitted Evaluation Job for Run --- (Cluster: {cluster})")
 
