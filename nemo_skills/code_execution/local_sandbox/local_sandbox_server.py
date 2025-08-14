@@ -196,7 +196,8 @@ def execute_shell(command, timeout):
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
 
-def execute_cpp(generated_code, timeout):
+# Accept std_input to feed into the compiled binary.
+def execute_cpp(generated_code, timeout, std_input=""):
     src_file = None
     bin_file = None
     try:
@@ -217,14 +218,18 @@ def execute_cpp(generated_code, timeout):
         if compile_proc.returncode != 0:
             return {"process_status": "compile_error", "stdout": compile_proc.stdout, "stderr": compile_proc.stderr}
 
+        # Launch the compiled binary, providing stdin so that interactive programs work.
         run_proc = subprocess.Popen(
             [bin_file],
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             preexec_fn=set_limits,
         )
         try:
-            stdout, stderr = run_proc.communicate(timeout=timeout)
+            # Convert std_input to bytes if necessary
+            stdin_bytes = std_input.encode() if isinstance(std_input, str) else std_input
+            stdout, stderr = run_proc.communicate(input=stdin_bytes, timeout=timeout)
         except subprocess.TimeoutExpired:
             kill_process_tree(run_proc)
             stdout, stderr = run_proc.communicate()
@@ -275,7 +280,7 @@ def execute():
     elif language == 'shell':
         return execute_shell(generated_code, timeout)
     elif language in ('cpp', 'c++', 'cpp17', 'c++17'):
-        return execute_cpp(generated_code, timeout)
+        return execute_cpp(generated_code, timeout, std_input)
     else:
         return execute_python(generated_code, std_input, timeout, language)
 
