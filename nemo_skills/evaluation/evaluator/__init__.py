@@ -19,7 +19,7 @@ from nemo_skills.evaluation.evaluator.code import eval_evalplus, eval_livecodebe
 from nemo_skills.evaluation.evaluator.ifbench import eval_ifbench
 from nemo_skills.evaluation.evaluator.ifeval import eval_if
 #from nemo_skills.evaluation.evaluator.math import eval_lean4_proof, eval_lean4_statement, eval_math
-from nemo_skills.evaluation.evaluator.mcq import eval_mcq
+#from nemo_skills.evaluation.evaluator.mcq import eval_mcq
 from nemo_skills.evaluation.evaluator.ruler import eval_ruler
 from nemo_skills.evaluation.evaluator.scicode import eval_scicode
 from nemo_skills.evaluation.evaluator.ioi import eval_ioi
@@ -40,7 +40,7 @@ EVALUATOR_MAP = {
     'answer_judgement': dummy_eval,
     #'lean4-proof': eval_lean4_proof,
     #'lean4-statement': eval_lean4_statement,
-    'multichoice': eval_mcq,
+    #'multichoice': eval_mcq,
     'ruler': eval_ruler,
     'livecodebench': eval_livecodebench,
     'livecodebench_pro': eval_livecodebench_pro,
