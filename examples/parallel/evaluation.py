@@ -58,7 +58,7 @@ def main( code_input_file: str,  cluster: str):
 
     # Command to run filter.py
     eval_command = (
-        f"pip install latex2sympy2 && python -m nemo_skills.evaluation.evaluate_results "
+        f"python -m nemo_skills.evaluation.evaluate_results "
         f"    ++input_files={code_input_file} "
         f"    {eval_args}"
     )
