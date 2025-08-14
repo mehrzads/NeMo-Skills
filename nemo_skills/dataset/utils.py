@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Dict
 from urllib.error import URLError
 
-from nemo_skills.evaluation.math_grader import extract_answer
+#from nemo_skills.evaluation.math_grader import extract_answer
 from nemo_skills.pipeline.utils import cluster_download_file, get_unmounted_path
 
 
@@ -211,8 +211,8 @@ def save_data_from_qwen(dataset, split="test"):
             if dataset == "olympiadbench":
                 entry["expected_answer"] = entry.pop("final_answer")[0].strip("$")
 
-            if dataset == "minerva_math":
-                entry["expected_answer"] = extract_answer(entry["solution"])
+            #if dataset == "minerva_math":
+            #   entry["expected_answer"] = extract_answer(entry["solution"])
 
             data.append(entry)
 
