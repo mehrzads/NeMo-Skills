@@ -65,43 +65,19 @@ def main( code_input_file: str,  cluster: str):
     )
     
     
-#
- #   run_cmd(
- #       ctx=wrap_arguments(""), # No hydra overrides needed for this simple script dispatch
- #       cluster=cluster,
- #       command=eval_command,
- #       expname=eval_job_expname,
- #       log_dir=str(eval_log_dir),
- #       num_nodes=server_nodes,
- #       num_gpus=server_gpus,
- #       with_sandbox=True,
- #       time_min=merge_time_min,
- #   )
-    eval(
-        ctx=wrap_arguments(
-                "++inference.tokens_to_generate=120000 "
-                "++inference.temperature=1.0 "
-                "++inference.top_p=1.0 "
-                "++max_concurrent_requests=1024 "
-                "++prompt_config=gpt-oss/code-sean "
-                "++prompt_template=gpt-oss-high "  
-                "++skip_filled=True "            
-            ), # No hydra overrides needed for this simple script dispatch
+
+    run_cmd(
+        ctx=wrap_arguments(""), # No hydra overrides needed for this simple script dispatch
         cluster=cluster,
-        benchmarks="ioi24:1",
-        extra_eval_args=eval_args,
-        split="test",
+        command=eval_command,
+        expname=eval_job_expname,
+        log_dir=str(eval_log_dir),
+        num_nodes=server_nodes,
+        num_gpus=server_gpus,
         with_sandbox=True,
-        expname="oss_ioi_full",
-        model="/hf_models/gpt-oss-120b",
-        server_type="vllm",
-        server_gpus=8,
-        server_nodes=1,
-        server_args="--async-scheduling --max-num-seqs=1024",
-        data_dir="/workspace/llmcoding/eval_dataset/",
-        output_dir="/workspace/test/",
-        time_min=merge_time_min,               
+        time_min=merge_time_min,
     )
+   
     print(f"--- Submitted Evaluation Job for Run --- (Cluster: {cluster})")
 
     print("\nAll evaluation jobs submitted.")
