@@ -150,6 +150,10 @@ class Sandbox(abc.ABC):
                 timeout=timeout,
                 headers={"Content-Type": "application/json"},
             )
+
+        if not (200 <= output.status_code < 300):
+            LOG.error(f"Request failed with status {output.status_code}. Request: {request}")
+
         # retrying 502 errors
         if output.status_code == 502:
             raise httpx.TimeoutException("502 error")
