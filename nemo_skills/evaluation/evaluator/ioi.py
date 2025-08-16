@@ -47,7 +47,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
     global worker_sandbox
 
     unique_dir = f"/tmp/ioi_run_{worker_id}_{os.getpid()}"
-    print(f"running test case in {unique_dir} for worker {worker_id}")
+
     try:
         # 1. Create all necessary files in one batch command
         grader_files = task_args.get("grader_files", [])
@@ -96,19 +96,18 @@ _EOT_
 """)
 
         setup_script = "\n".join(file_creation_commands)
-        print(f"Setup script\n")
         setup_result, _ = worker_loop.run_until_complete(
             worker_sandbox.execute_code(setup_script, language='shell')
         )
         if setup_result.get('stderr'):
             raise Exception(f"File setup failed: {setup_result['stderr']}")
-        print(f"Setup Result\n")
+
         # 2. Compile the code
         compile_command = f"cd {unique_dir} && ./compile.sh"
         compile_result, _ = worker_loop.run_until_complete(
             worker_sandbox.execute_code(compile_command, language='shell')
         )
-        print(f"Compile Result\n")
+
         result = {
             "compile_success": not compile_result.get('stderr'),
             "compile_stdout": compile_result.get('stdout', ''),
@@ -126,7 +125,7 @@ _EOT_
         run_result, _ = worker_loop.run_until_complete(
             worker_sandbox.execute_code(run_command, language='shell')
         )
-        print(f"Run Result\n")
+
         run_stdout = run_result.get('stdout', '')
         run_stderr = run_result.get('stderr', '')
 
@@ -211,12 +210,11 @@ def eval_ioi(cfg):
             print(f"Evaluating {x}/{len(samples)}")
             completion = extract_final_cpp_block(entry['generation'])
             completion = add_includes(completion, entry['ioi_id'])
-            print(f"Completion: {completion}")
+
             test_case_results = {}
             problem_name = entry['name']
             problem_metadata = metadata[problem_name]
             for subtask, subtask_data in problem_metadata.items():
-                print(f"Subtask: {subtask}")
                 tests = subtask_data['tests']
                 subtask_score = subtask_data['score']
                 subtask_score_precision = subtask_data['score_precision']
@@ -226,7 +224,6 @@ def eval_ioi(cfg):
 
                 scores = []
                 for i in range(0, len(test_items), batch_size):
-                    print(f"Batch: {i}")
                     batch = test_items[i:i + batch_size]
                     tasks = []
                     for local_idx, (test_name, test_data) in enumerate(batch):
@@ -241,7 +238,7 @@ def eval_ioi(cfg):
                         }
                         tasks.append((task_args, local_idx))
                     results = pool.starmap(run_test_case, tasks)
-                    print(f"Results: {results}")
+
                     for (test_name, _), result in zip(batch, results):
                         result_with_name = dict(result)
                         result_with_name['test_name'] = test_name
