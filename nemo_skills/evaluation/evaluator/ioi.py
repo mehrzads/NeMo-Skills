@@ -99,7 +99,6 @@ _EOT_
         setup_result, _ = worker_loop.run_until_complete(
             worker_sandbox.execute_code(setup_script, language='shell')
         )
-        print(setup_result)
         if setup_result.get('stderr'):
             raise Exception(f"File setup failed: {setup_result['stderr']}")
 
@@ -117,7 +116,7 @@ _EOT_
             "run_stderr": "",
             "score": 0.0,
         }
-        print(f"compile result: {result}")
+
         if not result["compile_success"]:
             return result
 
@@ -126,7 +125,7 @@ _EOT_
         run_result, _ = worker_loop.run_until_complete(
             worker_sandbox.execute_code(run_command, language='shell')
         )
-        print(f"run result: {run_result}")
+
         run_stdout = run_result.get('stdout', '')
         run_stderr = run_result.get('stderr', '')
 
@@ -134,6 +133,7 @@ _EOT_
             "run_stdout": run_stdout,
             "run_stderr": run_stderr,
         })
+
         try:
             result["score"] = float(result["run_stdout"].strip())
         except (ValueError, TypeError):
