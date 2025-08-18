@@ -88,8 +88,8 @@ cat <<'_EOT_' > {unique_dir}/input.txt
 {task_args["test_input"]}
 _EOT_
 """)
-
-        file_creation_commands.append(f"""
+        if task_args.get("test_output"):
+            file_creation_commands.append(f"""
 cat <<'_EOT_' > {unique_dir}/correct_output.txt
 {task_args["test_output"]}
 _EOT_
@@ -227,15 +227,25 @@ def eval_ioi(cfg):
                     batch = test_items[i:i + batch_size]
                     tasks = []
                     for local_idx, (test_name, test_data) in enumerate(batch):
-                        task_args = {
-                            "generated_code": completion,
-                            "problem_id": entry['ioi_id'],
-                            "grader_files": entry['grader_files'],
-                            "run_code": entry['run'],
-                            "compile_code": entry['compile'],
-                            "test_input": test_data['input'],
-                            "test_output": test_data['output']
-                        }
+                        if test_data.get("output"):
+                            task_args = {
+                                "generated_code": completion,
+                                "problem_id": entry['ioi_id'],
+                                "grader_files": entry['grader_files'],
+                                "run_code": entry['run'],
+                                "compile_code": entry['compile'],
+                                "test_input": test_data['input'],
+                                "test_output": test_data['output']
+                            }
+                        else:
+                            task_args = {
+                                "generated_code": completion,
+                                "problem_id": entry['ioi_id'],
+                                "grader_files": entry['grader_files'],
+                                "run_code": entry['run'],
+                                "compile_code": entry['compile'],
+                                "test_input": test_data['input']
+                            }
                         tasks.append((task_args, local_idx))
                     results = pool.starmap(run_test_case, tasks)
 
