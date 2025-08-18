@@ -176,7 +176,16 @@ def add_includes(code: str, problem_id: str) -> str:
     # use namespace std since models forget std:: often
     if "using namespace std;" not in code and "std::" not in code:
         code_header += "\nusing namespace std;\n\n"
-    return code_header + code
+    # add missing dummy implementations for IOI 25 triples problem
+    dummy = ""
+    if problem_id == "triples":
+        has_count = re.search(r"\bcount_triples\s*\(", code) is not None
+        has_construct = re.search(r"\bconstruct_range\s*\(", code) is not None
+        if has_construct and not has_count:
+            dummy += "long long count_triples(std::vector<int> H){return 0LL;}\n"
+        elif has_count and not has_construct:
+            dummy += "std::vector<int> construct_range(int M,int K){return {};}\n"
+    return code_header + code + ("\n" + dummy if dummy else "")
 
 
 def eval_ioi(cfg):
