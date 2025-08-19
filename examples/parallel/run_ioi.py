@@ -210,7 +210,9 @@ def eval_ioi(input_files, ref_file, test_file):
         grader_files = ref_data['grader_files']
         compile_code = ref_data['compile']
         code_list = sample['code_list']
-
+        print(f"Evaluating {id} {ioi_id}")
+        print(f"Run code: {len(code_list)}")
+        print(f"Run code: {run_code}")
         full_results = []
         for x, code in enumerate(code_list):
             print(f"Evaluating {x}/{len(code_list)}")
@@ -254,13 +256,13 @@ def main():
     parser.add_argument(
         "--ref_file",
         type=str,
-        default=IOIEvaluatorConfig().ref_file,
+        default="/workspace/llmcoding/eval_dataset/ioi24/ref_data.json",
         help="Path to IOI reference JSON (defaults to the dataset's test file).",
     )
     parser.add_argument(
         "--test_file",
         type=str,
-        default=IOIEvaluatorConfig().test_file,
+        default="/workspace/llmcoding/eval_dataset/ioi24/test_metadata.json",
         help="Path to IOI test metadata JSON (defaults to the dataset's test file).",
     )
 
