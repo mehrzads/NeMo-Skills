@@ -236,7 +236,7 @@ def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
                             "grader_files": grader_files,
                             "run_code": run_code,
                             "compile_code": compile_code,
-                            "test_input": test_data['content'],
+                            "test_input": "1U22aPSRkiGgB7zXbfJs9IqSfacMQ9t7\n" + test_data['content'],
                             
                         }
                         tasks.append((task_args, local_idx))
