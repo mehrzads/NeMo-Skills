@@ -206,7 +206,7 @@ def eval_ioi(input_files, ref_file, test_file):
         code_list = sample['code_list']
         print(f"Evaluating {id} {ioi_id}")
         print(f"Run code: {len(code_list)}")
-        print(f"Run code: {run_code}")
+        print(f"Metadata: {metadata}")
         full_results = []
         for x, code in enumerate(code_list):
             print(f"Evaluating {x}/{len(code_list)}")
