@@ -170,7 +170,7 @@ def add_includes(code: str, problem_id: str) -> str:
     return code_header + code
 
 
-def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
+def eval_ioi(input_files, ref_file, test_file):
     cfg_eval = {}
     cfg_sandbox = {}
     eval_config = IOIEvaluatorConfig(_init_nested=True, **cfg_eval)
@@ -207,8 +207,8 @@ def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
         print(f"Evaluating {id} {ioi_id}")
         print(f"Run code: {len(code_list)}")
         full_results = []
-        for x, code in enumerate(code_list):
-            print(f"Evaluating {x}/{len(code_list)}")
+        for x, code in enumerate(code_list[start_idx:min(end_idx, len(code_list))]):
+            print(f"Evaluating {x}/{len(code_list[start_idx:min(end_idx, len(code_list))])}")
             completion = add_includes(code, ioi_id)
             # Resolve key in metadata robustly: try numeric id, string id, ioi_id
             metadata_key = None
@@ -226,7 +226,7 @@ def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
                 )
             test_items = metadata[metadata_key]
             print(f"Test items: {test_items}")
-            for i in range(start_idx, min(end_idx, len(test_items)), batch_size):
+            for i in range(0, len(test_items), batch_size):
                 batch = test_items[i:i + batch_size]
                 tasks = []
                 for local_idx, (test_data) in enumerate(batch):
@@ -292,7 +292,7 @@ def main():
     for token in args.input_files:
         raw_inputs.extend([part for part in token.split(',') if part])
 
-    eval_ioi(raw_inputs, args.ref_file, args.test_file, args.start_idx, args.end_idx)
+    eval_ioi(raw_inputs, args.ref_file, args.test_file)
 
 
 if __name__ == "__main__":
