@@ -170,6 +170,49 @@ def add_includes(code: str, problem_id: str) -> str:
     return code_header + code
 
 
+def extract_input_secret(grader_files):
+    """
+    Extract the secret used by the checker/interactor from grader files.
+    Priority:
+      1) input_secret if present
+      2) output_secret if input_secret is absent
+    If a file also contains 'char secret[1000];', it gets priority during search.
+    """
+    secret_decl = 'char secret[1000];'
+    # Capture either input_secret or output_secret definitions
+    pattern_both = re.compile(
+        r'const\s+std::string\s+(input_secret|output_secret)\s*=\s*"([^"]+)"'
+    )
+
+    def scan(files):
+        found = {"input_secret": None, "output_secret": None}
+        for file_path, file_content in files:
+            for match in pattern_both.finditer(file_content):
+                var_name, value = match.group(1), match.group(2)
+                if var_name == 'input_secret' and found["input_secret"] is None:
+                    found["input_secret"] = value
+                if var_name == 'output_secret' and found["output_secret"] is None:
+                    found["output_secret"] = value
+        return found
+
+    # First pass: prefer files with the buffer declaration
+    prioritized = [(p, c) for (p, c) in grader_files if secret_decl in c]
+    if prioritized:
+        found = scan(prioritized)
+        if found["input_secret"]:
+            return found["input_secret"]
+        if found["output_secret"]:
+            return found["output_secret"]
+
+    # Second pass: scan all files
+    found = scan(grader_files)
+    if found["input_secret"]:
+        return found["input_secret"]
+    if found["output_secret"]:
+        return found["output_secret"]
+    return None
+
+
 def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
     cfg_eval = {}
     cfg_sandbox = {}
@@ -204,6 +247,8 @@ def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
         grader_files = ref_data['grader_files']
         compile_code = ref_data['compile']
         code_list = sample['code_list']
+        input_secret = extract_input_secret(grader_files)
+        print(f"Input secret: {input_secret}")
         print(f"Evaluating {id} {ioi_id}")
         print(f"Run code: {len(code_list)}")
         per_code_results = {}
@@ -240,7 +285,7 @@ def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
                             "grader_files": grader_files,
                             "run_code": run_code,
                             "compile_code": compile_code,
-                            "test_input": "1U22aPSRkiGgB7zXbfJs9IqSfacMQ9t7\n" + test_data['content'],
+                            "test_input": ((input_secret + "\n") if input_secret else "") + test_data['content'],
                             
                         }
                         tasks.append((task_args, local_idx))
