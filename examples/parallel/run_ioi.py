@@ -273,7 +273,6 @@ def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
                     f"Available keys preview: {available_keys_preview}"
                 )
             test_items = metadata[metadata_key]
-            print(f"Test items: {test_items}")
             code_results = []
             for i in range(0, len(test_items), batch_size):
                 batch = test_items[i:i + batch_size]
