@@ -170,7 +170,7 @@ def add_includes(code: str, problem_id: str) -> str:
     return code_header + code
 
 
-def eval_ioi(input_files, ref_file, test_file):
+def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
     cfg_eval = {}
     cfg_sandbox = {}
     eval_config = IOIEvaluatorConfig(_init_nested=True, **cfg_eval)
@@ -292,7 +292,7 @@ def main():
     for token in args.input_files:
         raw_inputs.extend([part for part in token.split(',') if part])
 
-    eval_ioi(raw_inputs, args.ref_file, args.test_file)
+    eval_ioi(raw_inputs, args.ref_file, args.test_file, args.start_idx, args.end_idx) 
 
 
 if __name__ == "__main__":
