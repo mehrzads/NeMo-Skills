@@ -194,18 +194,10 @@ def eval_ioi(input_files, ref_file, test_file):
     for jsonl_file in unroll_files(input_files):
         samples = []
         with open(jsonl_file) as f:
-            for line in f:
-                sample = json.loads(line)
-                samples.append(sample)
+            sample = json.load(f)
 
-        if len(samples) == 0:
-            raise ValueError(
-                f"No samples found in the file {jsonl_file}.\n"
-                f"Make sure the file contains jsonl data with 'codes' key which is a list containing "
-                f"individual code samples."
-            )
 
-        sample = samples[0]
+        
         id = sample['id']
         ioi_id = sample['ioi_id']
         run_code = ref_data['run']
