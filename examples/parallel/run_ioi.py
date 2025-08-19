@@ -210,7 +210,21 @@ def eval_ioi(input_files, ref_file, test_file):
         for x, code in enumerate(code_list):
             print(f"Evaluating {x}/{len(code_list)}")
             completion = add_includes(code, ioi_id)
-            test_items = metadata[id]
+            # Resolve key in metadata robustly: try numeric id, string id, ioi_id
+            metadata_key = None
+            if isinstance(metadata, dict):
+                for candidate in (id, str(id), ioi_id, str(ioi_id)):
+                    if candidate in metadata:
+                        metadata_key = candidate
+                        break
+            if metadata_key is None:
+                # Provide a helpful error
+                available_keys_preview = list(metadata.keys())[:10] if isinstance(metadata, dict) else type(metadata)
+                raise KeyError(
+                    f"Unable to find tests for id={id} or ioi_id={ioi_id} in test metadata. "
+                    f"Available keys preview: {available_keys_preview}"
+                )
+            test_items = metadata[metadata_key]
             print(f"Test items: {test_items}")
             for i in range(0, len(test_items), batch_size):
                 batch = test_items[i:i + batch_size]
