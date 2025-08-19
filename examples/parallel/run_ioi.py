@@ -187,7 +187,9 @@ def eval_ioi(input_files, ref_file, test_file):
         raise ValueError(f"Failed to find test cases in eval dataset directory: {test_file}")
 
     with open(test_file) as f:
-        metadata = json.load(f)
+        for line in f:
+            metadata = json.loads(line)            
+            print(f"Metadata: {metadata}")
 
     pool = multiprocessing.Pool(processes=batch_size, initializer=init_worker, initargs=(sandbox,))
 
