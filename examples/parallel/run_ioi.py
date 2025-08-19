@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import argparse
 import multiprocessing
 import os
 import re
@@ -89,11 +90,6 @@ cat <<'_EOT_' > {unique_dir}/input.txt
 _EOT_
 """)
 
-        file_creation_commands.append(f"""
-cat <<'_EOT_' > {unique_dir}/correct_output.txt
-{task_args["test_output"]}
-_EOT_
-""")
 
         setup_script = "\n".join(file_creation_commands)
         setup_result, _ = worker_loop.run_until_complete(
@@ -114,7 +110,6 @@ _EOT_
             "compile_stderr": compile_result.get('stderr', ''),
             "run_stdout": "",
             "run_stderr": "",
-            "score": 0.0,
         }
 
         if not result["compile_success"]:
@@ -133,16 +128,12 @@ _EOT_
             "run_stdout": run_stdout,
             "run_stderr": run_stderr,
         })
-
-        try:
-            result["score"] = float(result["run_stdout"].strip())
-        except (ValueError, TypeError):
-            result["score"] = 0.0
+        
 
         return result
 
     except Exception as e:
-        return {"score": 0.0, "output": "", "error": str(e)}
+        return {"output": "", "error": str(e)}
 
     finally:
         # 4. Clean up the directory
@@ -179,19 +170,26 @@ def add_includes(code: str, problem_id: str) -> str:
     return code_header + code
 
 
-def eval_ioi(cfg):
-    eval_config = IOIEvaluatorConfig(_init_nested=True, **cfg.eval_config)
-    sandbox = LocalSandbox()
+def eval_ioi(input_files, ref_file, test_file):
+    cfg_eval = {}
+    cfg_sandbox = {}
+    eval_config = IOIEvaluatorConfig(_init_nested=True, **cfg_eval)
+    sandbox = LocalSandbox(**cfg_sandbox)
     batch_size = eval_config.test_batch_size
-    if not os.path.exists(eval_config.test_file):
-        raise ValueError(f"Failed to find test cases in eval dataset directory: {eval_config.test_file}")
+    if not os.path.exists(ref_file):
+        raise ValueError(f"Failed to find test cases in eval dataset directory: {ref_file}")
+    with open(ref_file) as f:
+        ref_data = json.load(f)    
 
-    with open(eval_config.test_file) as f:
+    if not os.path.exists(test_file):
+        raise ValueError(f"Failed to find test cases in eval dataset directory: {test_file}")
+
+    with open(test_file) as f:
         metadata = json.load(f)
 
     pool = multiprocessing.Pool(processes=batch_size, initializer=init_worker, initargs=(sandbox,))
 
-    for jsonl_file in unroll_files(cfg.input_files):
+    for jsonl_file in unroll_files(input_files):
         samples = []
         with open(jsonl_file) as f:
             for line in f:
@@ -205,72 +203,76 @@ def eval_ioi(cfg):
                 f"individual code samples."
             )
 
-        outputs = []
-        for x, entry in enumerate(samples):
-            print(f"Evaluating {x}/{len(samples)}")
-            completion = extract_final_cpp_block(entry['generation'])
-            completion = add_includes(completion, entry['ioi_id'])
+        sample = samples[0]
+        id = sample['id']
+        ioi_id = sample['ioi_id']
+        run_code = ref_data['run']
+        grader_files = ref_data['grader_files']
+        compile_code = ref_data['compile']
+        code_list = sample['code_list']
 
-            test_case_results = {}
-            problem_name = entry['name']
-            problem_metadata = metadata[problem_name]
-            for subtask, subtask_data in problem_metadata.items():
-                tests = subtask_data['tests']
-                subtask_score = subtask_data['score']
-                subtask_score_precision = subtask_data['score_precision']
-                subtask_passed = True
-                subtask_outputs = []
-                test_items = list(tests.items())
-
-                scores = []
-                for i in range(0, len(test_items), batch_size):
-                    batch = test_items[i:i + batch_size]
-                    tasks = []
-                    for local_idx, (test_name, test_data) in enumerate(batch):
+        full_results = []
+        for x, code in enumerate(code_list):
+            print(f"Evaluating {x}/{len(code_list)}")
+            completion = add_includes(code, ioi_id)
+            test_items = list(metadata[id].items())
+            for i in range(0, len(test_items), batch_size):
+                batch = test_items[i:i + batch_size]
+                tasks = []
+                for local_idx, (test_data) in enumerate(batch):
                         task_args = {
                             "generated_code": completion,
-                            "problem_id": entry['ioi_id'],
-                            "grader_files": entry['grader_files'],
-                            "run_code": entry['run'],
-                            "compile_code": entry['compile'],
+                            "problem_id": ioi_id,
+                            "grader_files": grader_files,
+                            "run_code": run_code,
+                            "compile_code": compile_code,
                             "test_input": test_data['input'],
-                            "test_output": test_data['output']
+                            
                         }
                         tasks.append((task_args, local_idx))
-                    results = pool.starmap(run_test_case, tasks)
+                results = pool.starmap(run_test_case, tasks)
+                full_results.extend(results)
 
-                    for (test_name, _), result in zip(batch, results):
-                        result_with_name = dict(result)
-                        result_with_name['test_name'] = test_name
-                        subtask_outputs.append(result_with_name)
-                        scores.append(float(result['score']))
-                        if float(result['score']) == 0.0:
-                            # break early as we failed this test case.
-                            subtask_passed = False
-                            break
-                    if not subtask_passed:
-                        break
-
-                effective_score = round(min([score for score in scores]) * subtask_score, subtask_score_precision)
-                test_case_results[subtask] = {"score": effective_score, "outputs": subtask_outputs}
-
-            outputs.append({
-                "name": entry['name'],
-                "subtask": entry['subtask'],
-                "test_case_results": test_case_results,
-            })
-
-        for s, o in zip(samples, outputs):
-            s['test_case_results'] = o['test_case_results']
-        jdump(samples, jsonl_file, mode='wt')
-
-        total_passed = 0
-        total_problems = len(outputs)
-        for o in outputs:
-            for subtask_result in o["test_case_results"].values():
-                if subtask_result["score"] > 0:
-                    total_passed += 1
-        print(f"Subtasks passed: {total_passed} out of {total_problems * len(metadata[o['name']])}")
+        
+        with open(f"{jsonl_file}.full_results.jsonl", "wt") as f:
+            for result in full_results:
+                f.write(json.dumps(result) + "\n")
 
     pool.close()
     pool.join()
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Evaluate IOI generations against provided test cases.")
+    parser.add_argument(
+        "--input_files",
+        type=str,
+        nargs='+',
+        required=True,
+        help="Space- or comma-separated list of JSONL files or glob patterns containing generations.",
+    )
+    parser.add_argument(
+        "--ref_file",
+        type=str,
+        default=IOIEvaluatorConfig().ref_file,
+        help="Path to IOI reference JSON (defaults to the dataset's test file).",
+    )
+    parser.add_argument(
+        "--test_file",
+        type=str,
+        default=IOIEvaluatorConfig().test_file,
+        help="Path to IOI test metadata JSON (defaults to the dataset's test file).",
+    )
+
+    args = parser.parse_args()
+
+    # Support comma-separated items passed as a single token
+    raw_inputs = []
+    for token in args.input_files:
+        raw_inputs.extend([part for part in token.split(',') if part])
+
+    eval_ioi(raw_inputs, args.ref_file, args.test_file)
+
+
+if __name__ == "__main__":
+    main()
