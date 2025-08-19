@@ -34,7 +34,7 @@ server_nodes = 1
 server_gpus = 1 # merge.py is likely CPU-bound
 merge_time_min = '00:20:00' # Adjust as needed for merge.py runtime
 
-def main( code_input_file: str,  cluster: str, ref_file: str, test_file: str):            
+def main( code_input_file: str,  cluster: str, ref_file: str, test_file: str, start_idx: int, end_idx: int):            
     print(f"Code input file provided: {code_input_file}")
 
     # Use the provided path directly
@@ -61,7 +61,9 @@ def main( code_input_file: str,  cluster: str, ref_file: str, test_file: str):
         f"sleep 30 && cd /nemo_run/code/examples/parallel/ && python run_ioi.py "
         f"    --input_files={code_input_file} "
         f"    --ref_file={ref_file} "
-        f"    --test_file={test_file}"
+        f"    --test_file={test_file} "
+        f"    --start_idx={start_idx} "
+        f"    --end_idx={end_idx} "
     )
     
     
@@ -92,10 +94,14 @@ if __name__ == "__main__":
                         help="The full path to the reference file.")
     parser.add_argument("--test_file", type=str, required=True, 
                         help="The full path to the test file.")
+    parser.add_argument("--start_idx", type=int, default=0, 
+                        help="The start index for the evaluation.")
+    parser.add_argument("--end_idx", type=int, default=1000, 
+                        help="The end index for the evaluation.")
     args, unknown_args = parser.parse_known_args()
 
     if not args.code_input_file:
         print("Error: Code input file path cannot be empty.")
         sys.exit(1)
         
-    main(args.code_input_file, args.cluster, args.ref_file, args.test_file)
+    main(args.code_input_file, args.cluster, args.ref_file, args.test_file, args.start_idx, args.end_idx)

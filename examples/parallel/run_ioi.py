@@ -170,7 +170,7 @@ def add_includes(code: str, problem_id: str) -> str:
     return code_header + code
 
 
-def eval_ioi(input_files, ref_file, test_file):
+def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
     cfg_eval = {}
     cfg_sandbox = {}
     eval_config = IOIEvaluatorConfig(_init_nested=True, **cfg_eval)
@@ -226,7 +226,7 @@ def eval_ioi(input_files, ref_file, test_file):
                 )
             test_items = metadata[metadata_key]
             print(f"Test items: {test_items}")
-            for i in range(0, len(test_items), batch_size):
+            for i in range(start_idx, min(end_idx, len(test_items)), batch_size):
                 batch = test_items[i:i + batch_size]
                 tasks = []
                 for local_idx, (test_data) in enumerate(batch):
@@ -273,7 +273,18 @@ def main():
         default="/workspace/llmcoding/eval_dataset/ioi24/test_metadata.json",
         help="Path to IOI test metadata JSON (defaults to the dataset's test file).",
     )
-
+    parser.add_argument(
+        "--start_idx",
+        type=int,
+        default=0,
+        help="Start index for the evaluation.",
+    )
+    parser.add_argument(
+        "--end_idx",
+        type=int,
+        default=1000,
+        help="End index for the evaluation.",
+    )
     args = parser.parse_args()
 
     # Support comma-separated items passed as a single token
@@ -281,7 +292,7 @@ def main():
     for token in args.input_files:
         raw_inputs.extend([part for part in token.split(',') if part])
 
-    eval_ioi(raw_inputs, args.ref_file, args.test_file)
+    eval_ioi(raw_inputs, args.ref_file, args.test_file, args.start_idx, args.end_idx)
 
 
 if __name__ == "__main__":
