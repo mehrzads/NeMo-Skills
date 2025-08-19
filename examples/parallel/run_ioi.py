@@ -206,9 +206,12 @@ def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
         code_list = sample['code_list']
         print(f"Evaluating {id} {ioi_id}")
         print(f"Run code: {len(code_list)}")
-        full_results = []
-        for x, code in enumerate(code_list[start_idx:min(end_idx, len(code_list))]):
-            print(f"Evaluating {x}/{len(code_list[start_idx:min(end_idx, len(code_list))])}")
+        per_code_results = {}
+        _slice_end = min(end_idx, len(code_list))
+        _slice_len = max(0, _slice_end - start_idx)
+        for x, code in enumerate(code_list[start_idx:_slice_end]):
+            abs_x = x + start_idx
+            print(f"Evaluating {x}/{_slice_len}")
             completion = add_includes(code, ioi_id)
             # Resolve key in metadata robustly: try numeric id, string id, ioi_id
             metadata_key = None
@@ -226,6 +229,7 @@ def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
                 )
             test_items = metadata[metadata_key]
             print(f"Test items: {test_items}")
+            code_results = []
             for i in range(0, len(test_items), batch_size):
                 batch = test_items[i:i + batch_size]
                 tasks = []
@@ -241,12 +245,13 @@ def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
                         }
                         tasks.append((task_args, local_idx))
                 results = pool.starmap(run_test_case, tasks)
-                full_results.extend(results)
+                code_results.extend(results)
+            per_code_results[str(abs_x)] = code_results
 
         
-        with open(f"{jsonl_file}.full_results.jsonl", "wt") as f:
-            for result in full_results:
-                f.write(json.dumps(result) + "\n")
+        base_json_path, _ = os.path.splitext(jsonl_file)
+        with open(f"{base_json_path}_results.json", "wt") as f:
+            json.dump(per_code_results, f)
 
     pool.close()
     pool.join()
