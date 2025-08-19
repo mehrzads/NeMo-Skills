@@ -206,12 +206,12 @@ def eval_ioi(input_files, ref_file, test_file):
         code_list = sample['code_list']
         print(f"Evaluating {id} {ioi_id}")
         print(f"Run code: {len(code_list)}")
-        print(f"Metadata: {metadata}")
         full_results = []
         for x, code in enumerate(code_list):
             print(f"Evaluating {x}/{len(code_list)}")
             completion = add_includes(code, ioi_id)
-            test_items = list(metadata[id].items())
+            test_items = metadata[id]
+            print(f"Test items: {test_items}")
             for i in range(0, len(test_items), batch_size):
                 batch = test_items[i:i + batch_size]
                 tasks = []
@@ -222,7 +222,7 @@ def eval_ioi(input_files, ref_file, test_file):
                             "grader_files": grader_files,
                             "run_code": run_code,
                             "compile_code": compile_code,
-                            "test_input": test_data['input'],
+                            "test_input": test_data['content'],
                             
                         }
                         tasks.append((task_args, local_idx))
