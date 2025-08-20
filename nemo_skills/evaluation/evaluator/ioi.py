@@ -97,7 +97,7 @@ _EOT_
 
         setup_script = "\n".join(file_creation_commands)
         setup_result, _ = worker_loop.run_until_complete(
-            worker_sandbox.execute_code(setup_script, language='shell')
+            worker_sandbox.execute_code(setup_script, language='shell', timeout=120)
         )
         if setup_result.get('stderr'):
             raise Exception(f"File setup failed: {setup_result['stderr']}")
@@ -105,7 +105,7 @@ _EOT_
         # 2. Compile the code
         compile_command = f"cd {unique_dir} && ./compile.sh"
         compile_result, _ = worker_loop.run_until_complete(
-            worker_sandbox.execute_code(compile_command, language='shell')
+            worker_sandbox.execute_code(compile_command, language='shell', timeout=120)
         )
 
         result = {
@@ -123,7 +123,7 @@ _EOT_
         # 3. Run the code
         run_command = f"cd {unique_dir} && ./run.sh"
         run_result, _ = worker_loop.run_until_complete(
-            worker_sandbox.execute_code(run_command, language='shell')
+            worker_sandbox.execute_code(run_command, language='shell', timeout=120)
         )
 
         run_stdout = run_result.get('stdout', '')
@@ -149,7 +149,7 @@ _EOT_
         # Fire and forget; ignore return values
         try:
             worker_loop.run_until_complete(
-                worker_sandbox.execute_code(f"rm -rf {unique_dir}", language='shell')
+                worker_sandbox.execute_code(f"rm -rf {unique_dir}", language='shell', timeout=120)
             )
         except Exception:
             pass
