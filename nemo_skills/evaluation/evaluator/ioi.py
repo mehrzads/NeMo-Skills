@@ -11,11 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import json
 import multiprocessing
 import os
 import re
-import asyncio
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
 from nemo_skills.file_utils import jdump
@@ -24,17 +24,17 @@ from nemo_skills.utils import nested_dataclass, unroll_files
 
 @nested_dataclass(kw_only=True)
 class IOIEvaluatorConfig:
-    dataset: str = "ioi24"
+    dataset: str = "ioi"
     num_workers: int = 4  # number of test workers
     test_batch_size: int = 5  # number of tests to run concurrently
     # where test cases are stored in automatically mounted eval datasets folder.
-    test_file: str = "/eval_dataset/ioi24/test_metadata.json"
+    test_file: str = "/eval_dataset/ioi/test_metadata.json"
 
 
 def init_worker(sandbox_arg):
     global worker_sandbox
     worker_sandbox = sandbox_arg
-    # Create and set a dedicated event loop for this worker process.  
+    # Create and set a dedicated event loop for this worker process.
     # Re-using the same loop for all subsequent sandbox calls avoids the
     # "Event loop is closed" error that occurs when each call spins up
     # and closes its own loop (as happens with asyncio.run).
@@ -53,47 +53,59 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         grader_files = task_args.get("grader_files", [])
         file_creation_commands = [f"mkdir -p {unique_dir}/graders"]
 
-        file_creation_commands.append(f"""
+        file_creation_commands.append(
+            f"""
 cat <<'_EOT_' > {unique_dir}/graders/{task_args["problem_id"]}.cpp
 {task_args["generated_code"]}
 _EOT_
-""")
+"""
+        )
 
         for filepath, content in grader_files:
             dir_name = os.path.dirname(filepath)
             if dir_name:
                 file_creation_commands.append(f"mkdir -p {unique_dir}/{dir_name}")
-            file_creation_commands.append(f"""
+            file_creation_commands.append(
+                f"""
 cat <<'_EOT_' > {unique_dir}/{filepath}
 {content}
 _EOT_
-""")
+"""
+            )
 
-        file_creation_commands.append(f"""
+        file_creation_commands.append(
+            f"""
 cat <<'_EOT_' > {unique_dir}/compile.sh
 {task_args["compile_code"]}
 _EOT_
 chmod +x {unique_dir}/compile.sh
-""")
+"""
+        )
 
-        file_creation_commands.append(f"""
+        file_creation_commands.append(
+            f"""
 cat <<'_EOT_' > {unique_dir}/run.sh
 {task_args["run_code"]}
 _EOT_
 chmod +x {unique_dir}/run.sh
-""")
+"""
+        )
 
-        file_creation_commands.append(f"""
+        file_creation_commands.append(
+            f"""
 cat <<'_EOT_' > {unique_dir}/input.txt
 {task_args["test_input"]}
 _EOT_
-""")
+"""
+        )
 
-        file_creation_commands.append(f"""
+        file_creation_commands.append(
+            f"""
 cat <<'_EOT_' > {unique_dir}/correct_output.txt
 {task_args["test_output"]}
 _EOT_
-""")
+"""
+        )
 
         setup_script = "\n".join(file_creation_commands)
         setup_result, _ = worker_loop.run_until_complete(
@@ -129,10 +141,12 @@ _EOT_
         run_stdout = run_result.get('stdout', '')
         run_stderr = run_result.get('stderr', '')
 
-        result.update({
-            "run_stdout": run_stdout,
-            "run_stderr": run_stderr,
-        })
+        result.update(
+            {
+                "run_stdout": run_stdout,
+                "run_stderr": run_stderr,
+            }
+        )
 
         try:
             result["score"] = float(result["run_stdout"].strip())
@@ -163,7 +177,7 @@ def extract_final_cpp_block(text):
 
 def add_includes(code: str, problem_id: str) -> str:
     """
-        Fix common compilation errors for IOI problems.
+    Fix common compilation errors for IOI problems.
     """
     if not code:
         return code
@@ -233,7 +247,7 @@ def eval_ioi(cfg):
 
                 scores = []
                 for i in range(0, len(test_items), batch_size):
-                    batch = test_items[i:i + batch_size]
+                    batch = test_items[i : i + batch_size]
                     tasks = []
                     for local_idx, (test_name, test_data) in enumerate(batch):
                         task_args = {
@@ -243,7 +257,7 @@ def eval_ioi(cfg):
                             "run_code": entry['run'],
                             "compile_code": entry['compile'],
                             "test_input": test_data['input'],
-                            "test_output": test_data['output']
+                            "test_output": test_data['output'],
                         }
                         tasks.append((task_args, local_idx))
                     results = pool.starmap(run_test_case, tasks)
@@ -263,11 +277,13 @@ def eval_ioi(cfg):
                 effective_score = round(min([score for score in scores]) * subtask_score, subtask_score_precision)
                 test_case_results[subtask] = {"score": effective_score, "outputs": subtask_outputs}
 
-            outputs.append({
-                "name": entry['name'],
-                "subtask": entry['subtask'],
-                "test_case_results": test_case_results,
-            })
+            outputs.append(
+                {
+                    "name": entry['name'],
+                    "subtask": entry['subtask'],
+                    "test_case_results": test_case_results,
+                }
+            )
 
         for s, o in zip(samples, outputs):
             s['test_case_results'] = o['test_case_results']

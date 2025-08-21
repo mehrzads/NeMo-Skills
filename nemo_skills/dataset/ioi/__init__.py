@@ -16,4 +16,4 @@
 PROMPT_CONFIG = 'eval/ioi/codegen'
 DATASET_GROUP = 'code'
 METRICS_TYPE = "ioi"
-EVAL_ARGS = "++eval_type=ioi ++eval_config.dataset=ioi24"
+EVAL_ARGS = "++eval_type=ioi ++eval_config.dataset=ioi"

@@ -1,10 +1,10 @@
 import argparse
 import json
 import os.path
+from collections import defaultdict
 from pathlib import Path
 
 from datasets import load_dataset
-from collections import defaultdict
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -24,7 +24,10 @@ if __name__ == '__main__':
 
     test_cases = defaultdict(dict)
     for test_case in tests_dataset:
-        test_cases[test_case['problem_id']][test_case['test_name']] = {"input": test_case['test_input'], "output": test_case['test_output']}
+        test_cases[test_case['problem_id']][test_case['test_name']] = {
+            "input": test_case['test_input'],
+            "output": test_case['test_output'],
+        }
 
     ds = load_dataset("open-r1/ioi", split=args.split)
     entries = []
@@ -34,18 +37,20 @@ if __name__ == '__main__':
             selected_test_cases = test_cases[item['id']]
             tests = [test_cases for k, test_cases in selected_test_cases.items() if k in item['test_names']]
 
-            entries.append({
-                'id': x,
-                'run': run_code,
-                'compile': compile_code,
-                'name': item['name'],
-                'ioi_id': item['id'],
-                'subtask': item['subtask'],
-                'question': item['problem'],
-                'score': item['score'],
-                'grader_files': item['grader_files'],
-                'tests': tests
-            })
+            entries.append(
+                {
+                    'id': x,
+                    'run': run_code,
+                    'compile': compile_code,
+                    'name': item['name'],
+                    'ioi_id': item['id'],
+                    'subtask': item['subtask'],
+                    'question': item['problem'],
+                    'score': item['score'],
+                    'grader_files': item['grader_files'],
+                    'tests': tests,
+                }
+            )
 
     with open(os.path.join(args.output_dir, f'{args.split}.jsonl'), 'w') as f:
         f.write('\n'.join(json.dumps(x) for x in entries))
