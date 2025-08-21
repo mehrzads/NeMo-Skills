@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# NOTE: needs to run from the root of the repo!
-
-SANDBOX_NAME=${1:-'local-sandbox'}
-
-docker build --tag=${SANDBOX_NAME} -f dockerfiles/Dockerfile.sandbox .
-
-docker run --network=host --rm --memory=${NEMO_SKILLS_SANDBOX_MEM_LIMIT:-"16g"} --name=local-sandbox ${SANDBOX_NAME}
+# settings that define how evaluation should be done by default (all can be changed from cmdline)
+PROMPT_CONFIG = 'eval/ioi/codegen'
+DATASET_GROUP = 'code'
+METRICS_TYPE = "ioi"
+EVAL_ARGS = "++eval_type=ioi ++eval_config.dataset=ioi"
