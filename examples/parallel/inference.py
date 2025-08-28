@@ -30,6 +30,7 @@ def main(config: MainConfig):
     extra_overrides = (
         " ++inference.top_p=1.0 "
         " ++max_concurrent_requests=1024 "
+        "++inference.extra_body.reasoning_effort=high "
     )
 
     # Configure server settings based on model_name
@@ -90,7 +91,6 @@ def main(config: MainConfig):
     current_overrides = current_overrides.format(**format_dict)
     ctx = wrap_arguments(current_overrides)
 
- 
 
     if config.model_name == "gpt-oss-120b":
         generate(
