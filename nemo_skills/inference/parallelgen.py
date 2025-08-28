@@ -1,7 +1,7 @@
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 
 import json
-from dataclasses import field
+from dataclasses import asdict, field, is_dataclass
 
 from nemo_skills.utils import chunk_data, nested_dataclass, remove_thinking
 from nemo_skills.utils import get_logger_name
