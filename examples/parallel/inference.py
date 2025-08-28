@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
 from nemo_skills.inference.parallelgen import ParallelGenTask, ParallelGenConfig
+from pathlib import Path
 
 
 
@@ -9,7 +10,7 @@ class MainConfig(BaseModel):
     model_name: str
     tokens_to_generate: int
     time_min: str
-    input_file: str
+    input_files: list[str]
     output_dir: str
     prompt_config: str    
     inference_temperature: float
@@ -92,41 +93,46 @@ def main(config: MainConfig):
     ctx = wrap_arguments(current_overrides)
 
 
-    if config.model_name == "gpt-oss-120b":
-        generate(
-            ctx=ctx,
-            generation_type=config.generation_type,
-            cluster=config.cluster,
-            input_file=config.input_file,
-            output_dir=config.output_dir,
-            expname=expname,
-            model=model_path,            
-            server_type=server_type,
-            server_gpus=server_gpus,
-            server_nodes=server_nodes,
-            num_random_seeds=config.num_runs,
-            time_min="04:00:00",
-            with_sandbox=True,
-        )
-    else:
-         generate(
-            ctx=ctx,
-            generation_type=config.generation_type,
-            cluster=config.cluster,
-            input_file=config.input_file,
-            output_dir=config.output_dir,
-            expname=expname,
-            model=model_path,
-            server_type=server_type,
-            server_gpus=server_gpus,
-            server_nodes=server_nodes,
-            server_args=server_args,
-            num_random_seeds=config.num_runs,
-            time_min="04:00:00",
-            # set these according to your cluster configuration
-            # num_chunks=N,
-            # dependent_jobs=M,
-        )
+    for cur_input_file in config.input_files:
+        cur_stem = Path(cur_input_file).stem
+        cur_output_dir = f"{config.output_dir.rstrip('/')}/{cur_stem}"
+        cur_expname = f"{cur_stem}-{expname}"
+
+        if config.model_name == "gpt-oss-120b":
+            generate(
+                ctx=ctx,
+                generation_type=config.generation_type,
+                cluster=config.cluster,
+                input_file=cur_input_file,
+                output_dir=cur_output_dir,
+                expname=cur_expname,
+                model=model_path,
+                server_type=server_type,
+                server_gpus=server_gpus,
+                server_nodes=server_nodes,
+                num_random_seeds=config.num_runs,
+                time_min="04:00:00",
+                with_sandbox=True,
+            )
+        else:
+            generate(
+                ctx=ctx,
+                generation_type=config.generation_type,
+                cluster=config.cluster,
+                input_file=cur_input_file,
+                output_dir=cur_output_dir,
+                expname=cur_expname,
+                model=model_path,
+                server_type=server_type,
+                server_gpus=server_gpus,
+                server_nodes=server_nodes,
+                server_args=server_args,
+                num_random_seeds=config.num_runs,
+                time_min="04:00:00",
+                # set these according to your cluster configuration
+                # num_chunks=N,
+                # dependent_jobs=M,
+            )
 
 
 if __name__ == "__main__":
@@ -143,8 +149,10 @@ if __name__ == "__main__":
                         help="Temperature for inference")
     parser.add_argument("--tokens_to_generate", type=int, default=32768,
                         help="Number of tokens to generate")
+    parser.add_argument("--input_files", type=str, nargs='+', default=None,
+                        help="List of input files")
     parser.add_argument("--input_file", type=str, default="/workspace/llmcoding/eval_dataset/ioi/problems/1.jsonl",
-                        help="Input file (used in genselect_generation mode)")
+                        help="Single input file (deprecated; use --input_files)")
     parser.add_argument("--output_dir", type=str, default="/workspace/test/",
                         help="Output directory")
     parser.add_argument("--generation_type", type=str, default="generate",
@@ -161,7 +169,7 @@ if __name__ == "__main__":
         model_name=args.model_name,
         tokens_to_generate=args.tokens_to_generate,
         time_min="00:10:00",
-        input_file=args.input_file,
+        input_files=(args.input_files if args.input_files is not None else [args.input_file]),
         output_dir=args.output_dir,
         prompt_config=args.prompt_config,
         inference_temperature=args.inference_temperature,        
