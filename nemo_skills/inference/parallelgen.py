@@ -15,7 +15,7 @@ import hydra
 from nemo_skills.inference.model import server_params
 import sys
 import copy
-from nemo_skills.evaluation.eval_cpp.ioi import extract_final_cpp_block
+from nemo_skills.evaluation.evaluator.ioi import extract_final_cpp_block
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
