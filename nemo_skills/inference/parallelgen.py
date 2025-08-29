@@ -51,8 +51,7 @@ class ParallelGenTask(GenerationTask):
                 data.append(json.loads(line))
         # replicate data num_generations times
         data = [copy.deepcopy(item) for _ in range(self.cfg.num_generations) for item in data]  # deepcopy to avoid reference issues
-        for i in range(len(data)):
-            data[i]['unique_id'] = i
+
         # chunk the dataset if required
         if self.cfg.num_chunks is not None and self.cfg.chunk_id is not None:
             data, self.cfg.output_file = chunk_data(data, self.cfg.output_file, self.cfg.chunk_id, self.cfg.num_chunks)
@@ -92,10 +91,7 @@ class ParallelGenTask(GenerationTask):
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
                 generation_params["max_code_executions"] = data_point["total_code_executions"]
 
-        result = await self.llm.generate_async(**generation_params)
-        completion = extract_final_cpp_block(result["generation"])
-        print(completion)
-        return result
+        return await self.llm.generate_async(**generation_params)
 
 GENERATION_TASK_CLASS = ParallelGenTask
 
