@@ -15,6 +15,7 @@ import hydra
 from nemo_skills.inference.model import server_params
 import sys
 import copy
+from nemo_skills.evaluation.eval_cpp.ioi import extract_final_cpp_block
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
@@ -91,7 +92,10 @@ class ParallelGenTask(GenerationTask):
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
                 generation_params["max_code_executions"] = data_point["total_code_executions"]
 
-        return await self.llm.generate_async(**generation_params)
+        result = await self.llm.generate_async(**generation_params)
+        completion = extract_final_cpp_block(result["generation"])
+        print(completion)
+        return result
 
 GENERATION_TASK_CLASS = ParallelGenTask
 
