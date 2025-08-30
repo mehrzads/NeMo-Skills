@@ -19,6 +19,7 @@ class MainConfig(BaseModel):
     cluster: str    
     num_runs: int
     local_model: bool
+    top_p: float
 def main(config: MainConfig):
    
    
@@ -27,10 +28,11 @@ def main(config: MainConfig):
         " ++inference.tokens_to_generate={TOKENS_TO_GENERATE} "     
         " ++prompt_config={PROMPT_CONFIG} "
         " ++num_generations={NUM_GENERATIONS} "
-        " ++skip_filled=True "        
+        " ++skip_filled=True " 
+        " ++inference.top_p={TOP_P} "       
     )
     extra_overrides = (
-        " ++inference.top_p=1.0 "
+        
         " ++max_concurrent_requests=1024 "
         "++inference.extra_body.reasoning_effort=high "
     )
@@ -80,6 +82,7 @@ def main(config: MainConfig):
         "PROMPT_CONFIG": config.prompt_config,
         "PROMPT_TEMPLATE": prompt_template,
         "NUM_GENERATIONS": config.num_generations,
+        "TOP_P": config.top_p,
     }
      # Check if output_dir is provided in config, otherwise construct it
     if not config.output_dir:
@@ -166,6 +169,8 @@ if __name__ == "__main__":
                         help="Number of runs")
     parser.add_argument("--local", action="store_true", dest="local_model",
                         help="Use local model path under /workspace/hf_models")
+    parser.add_argument("--top_p", type=float, default=0.95,
+                        help="Top p for inference")
     args, unknown = parser.parse_known_args()
 
     main_config_instance = MainConfig(
@@ -181,5 +186,6 @@ if __name__ == "__main__":
         cluster=args.cluster,
         num_runs=args.num_runs,
         local_model=args.local_model,
+        top_p=args.top_p,
     )
-    main(main_config_instance)
+    main(main_config_instance)  
