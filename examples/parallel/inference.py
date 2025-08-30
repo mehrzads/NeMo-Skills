@@ -68,9 +68,7 @@ def main(config: MainConfig):
 
     
     if config.model_name == "aleks" or config.model_name == "open_reasoning_32b_cont_sft_cpp_codegen":
-        model_path = f"/workspace/hf_models/{config.model_name}" # Access via config object
-    if server_type == 'sglang':
-        model_path = f"/hf_models/sharded_0.7.0_sglang/{config.model_name}"
+        model_path = f"/workspace/hf_models/{config.model_name}" # Access via config object  
     else:       
         model_path = f"/hf_models/{config.model_name}" # Access via config object
     print(f"INFO: Using model path: {model_path}")
@@ -113,7 +111,7 @@ def main(config: MainConfig):
                 server_gpus=server_gpus,
                 server_nodes=server_nodes,
                 num_random_seeds=config.num_runs,
-                time_min="04:00:00",
+                time_min="00:10:00",
                 with_sandbox=True,
             )
         else:
