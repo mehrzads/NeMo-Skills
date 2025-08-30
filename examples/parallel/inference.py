@@ -18,6 +18,7 @@ class MainConfig(BaseModel):
     num_generations: int
     cluster: str    
     num_runs: int
+    local_model: bool
 def main(config: MainConfig):
    
    
@@ -67,7 +68,7 @@ def main(config: MainConfig):
         server_args = "--tensor-parallel-size=8" # Aligned with evaluation.py
 
     
-    if config.model_name == "aleks" or config.model_name == "open_reasoning_32b_cont_sft_cpp_codegen":
+    if config.local_model:
         model_path = f"/workspace/hf_models/{config.model_name}" # Access via config object  
     else:       
         model_path = f"/hf_models/{config.model_name}" # Access via config object
@@ -163,6 +164,8 @@ if __name__ == "__main__":
                         help="Cluster to use")
     parser.add_argument("--num_runs", type=int, default=1,
                         help="Number of runs")
+    parser.add_argument("--local", action="store_true", dest="local_model",
+                        help="Use local model path under /workspace/hf_models")
     args, unknown = parser.parse_known_args()
 
     main_config_instance = MainConfig(
@@ -177,5 +180,6 @@ if __name__ == "__main__":
         num_generations=args.num_generations,
         cluster=args.cluster,
         num_runs=args.num_runs,
+        local_model=args.local_model,
     )
     main(main_config_instance)
