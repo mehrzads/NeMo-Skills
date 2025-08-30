@@ -69,6 +69,8 @@ def main(config: MainConfig):
     
     if config.model_name == "aleks" or config.model_name == "open_reasoning_32b_cont_sft_cpp_codegen":
         model_path = f"/workspace/hf_models/{config.model_name}" # Access via config object
+    if server_type == 'sglang':
+        model_path = f"/hf_models/sharded_0.7.0_sglang/{config.model_name}"
     else:       
         model_path = f"/hf_models/{config.model_name}" # Access via config object
     print(f"INFO: Using model path: {model_path}")
