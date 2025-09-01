@@ -253,33 +253,22 @@ def eval_ioi(cfg):
                 f"individual code samples."
             )
 
-        # Progress/status handling
-        status_file = f"{jsonl_file}.eval"
         initial_completed = 0
-        if os.path.exists(status_file):
-            try:
-                with open(status_file, "rt") as sf:
-                    content = sf.read().strip()
-                    # Expect formats like "12/250"; fall back to first integer found
-                    m = re.search(r"(\d+)\s*/\s*(\d+)", content)
-                    if m:
-                        initial_completed = int(m.group(1))
-                    else:
-                        m2 = re.search(r"\d+", content)
-                        if m2:
-                            initial_completed = int(m2.group(0))
-                        else:
-                            initial_completed = 0
-            except Exception:
-                initial_completed = 0
-        initial_completed = max(0, min(initial_completed, len(samples)))
-
-        # Initial progress bar draw
-        _print_progress_bar(initial_completed, len(samples))
+        # Output file
+        output_file = f"{jsonl_file}.eval"        
+        if os.path.exists(output_file):
+            #check if each line is a valid json
+            with open(output_file, "rt") as f:
+                for line in f:
+                    #count the number of lines in the file
+                    initial_completed += 1
+                    if not json.loads(line):
+                        raise ValueError(f"Invalid JSON line in {output_file}: {line}")
+            
 
         outputs = []
         # Track which indices we updated so we can write back correctly on resume
-        updated_indices_to_results = {}
+        #updated_indices_to_results = {}
         processed_since_start = 0
 
         for x, entry in enumerate(samples[initial_completed:], start=initial_completed):
@@ -337,29 +326,25 @@ def eval_ioi(cfg):
                     "test_case_results": test_case_results,
                 }
             )
-            updated_indices_to_results[x] = test_case_results
+            #updated_indices_to_results[x] = test_case_results
+            entry["test_case_results"] = test_case_results
+            # write the entry to the output file
+            with open(output_file, "at") as f:
+                f.write(json.dumps(entry) + "\n")
 
-            # Update status file and progress bar
-            try:
-                with open(status_file, "wt") as sf:
-                    sf.write(f"{initial_completed + processed_since_start}/{len(samples)}")
-            except Exception:
-                pass
-            processed_since_start += 1
-            _print_progress_bar(initial_completed + processed_since_start, len(samples))
+          
         
         # Write done file
-        open(status_file + ".done", "w").close()
-        # delete status file
-        os.remove(status_file)
+        open(output_file + ".done", "w").close()
+      
         # Finish progress bar line with newline
         if len(samples) > 0:
             sys.stdout.write("\n")
 
         # Write only updated indices back to samples (supports resume)
-        for idx, result in updated_indices_to_results.items():
-            samples[idx]["test_case_results"] = result
-        jdump(samples, jsonl_file, mode="wt")
+        #for idx, result in updated_indices_to_results.items():
+        #    samples[idx]["test_case_results"] = result
+        #jdump(samples, jsonl_file, mode="wt")
 
         total_passed = 0
         total_problems = len(outputs)
