@@ -18,11 +18,12 @@
 import os
 import sys
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Union
 import re # Keep re import
 import argparse # Import argparse
 from nemo_skills.pipeline.cli import wrap_arguments, run_cmd
 from nemo_skills.pipeline.eval import eval
+from nemo_skills.pipeline.utils.cluster import get_cluster_config, cluster_path_exists
 
 
 
@@ -33,9 +34,24 @@ codegen_root = "/nemo_run/code/"
 server_nodes = 1
 server_gpus = 1 # merge.py is likely CPU-bound
 merge_time_min = '04:00:00' # Adjust as needed for merge.py runtime
-
-
         
+
+def eval_status_file_exists(code_input_file: Union[str, Path], cluster: Union[str, Dict, None] = None) -> bool:
+    """
+    Check if the progress count file exists for the given input file.
+
+    Uses the convention "<jsonl_file>.count" from the evaluator. If the
+    cluster executor is Slurm, checks existence via the SSH tunnel on the
+    remote filesystem; otherwise checks locally.
+    """
+    p = Path(code_input_file)
+    count_path = str(p) + ".eval.done"
+
+    cluster_config = get_cluster_config(cluster)
+    if cluster_config.get("executor") == "slurm":
+        return cluster_path_exists(cluster_config, count_path)
+    return Path(count_path).exists()
+
 
 def main( code_input_files: List[str],  cluster: str, eval_type: str):            
     print(f"Code input file provided: {code_input_files}")
@@ -43,6 +59,9 @@ def main( code_input_files: List[str],  cluster: str, eval_type: str):
     if eval_type == "ioi24":
         eval_args = "++eval_type=ioi  ++eval_config.test_file=/workspace/llmcoding/eval_dataset/ioi/ioi24_metadata.json"
     for code_input_file in code_input_files:
+        if eval_status_file_exists(code_input_file, cluster):
+            print(f"Evaluation already done for {code_input_file}")
+            continue
         # Use the provided path directly
         code_input_file = Path(code_input_file).absolute()
         code_input_dir = code_input_file.parent

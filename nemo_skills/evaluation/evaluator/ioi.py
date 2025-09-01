@@ -254,13 +254,22 @@ def eval_ioi(cfg):
             )
 
         # Progress/status handling
-        status_file = f"{jsonl_file}.count"
+        status_file = f"{jsonl_file}.eval"
         initial_completed = 0
         if os.path.exists(status_file):
             try:
                 with open(status_file, "rt") as sf:
-                    content = sf.read()
-                    initial_completed = content.count("x")
+                    content = sf.read().strip()
+                    # Expect formats like "12/250"; fall back to first integer found
+                    m = re.search(r"(\d+)\s*/\s*(\d+)", content)
+                    if m:
+                        initial_completed = int(m.group(1))
+                    else:
+                        m2 = re.search(r"\d+", content)
+                        if m2:
+                            initial_completed = int(m2.group(0))
+                        else:
+                            initial_completed = 0
             except Exception:
                 initial_completed = 0
         initial_completed = max(0, min(initial_completed, len(samples)))
@@ -332,13 +341,17 @@ def eval_ioi(cfg):
 
             # Update status file and progress bar
             try:
-                with open(status_file, "at") as sf:
-                    sf.write("x")
+                with open(status_file, "wt") as sf:
+                    sf.write(f"{initial_completed + processed_since_start}/{len(samples)}")
             except Exception:
                 pass
             processed_since_start += 1
             _print_progress_bar(initial_completed + processed_since_start, len(samples))
-
+        
+        # Write done file
+        open(status_file + ".done", "w").close()
+        # delete status file
+        os.remove(status_file)
         # Finish progress bar line with newline
         if len(samples) > 0:
             sys.stdout.write("\n")
