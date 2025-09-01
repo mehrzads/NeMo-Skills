@@ -62,6 +62,9 @@ def main( code_input_files: List[str],  cluster: str, eval_type: str):
         if eval_status_file_exists(code_input_file, cluster):
             print(f"Evaluation already done for {code_input_file}")
             continue
+        else:
+            print(f"Evaluation not done for {code_input_file}")
+            continue
         # Use the provided path directly
         code_input_file = Path(code_input_file).absolute()
         code_input_dir = code_input_file.parent
