@@ -34,13 +34,14 @@ server_nodes = 1
 server_gpus = 1 # merge.py is likely CPU-bound
 merge_time_min = '04:00:00' # Adjust as needed for merge.py runtime
 
-eval_args = "++eval_type=ioi ++eval_config.dataset=ioi ++eval_config.test_file=/workspace/llmcoding/eval_dataset/ioi/ioi25_metadata.json"
-if eval_type == "ioi24":
-    eval_args = "++eval_type=ioi ++eval_config.dataset=ioi ++eval_config.test_file=/workspace/llmcoding/eval_dataset/ioi/ioi24_metadata.json"
+
         
 
 def main( code_input_files: List[str],  cluster: str, eval_type: str):            
     print(f"Code input file provided: {code_input_files}")
+    eval_args = "++eval_type=ioi ++eval_config.dataset=ioi ++eval_config.test_file=/workspace/llmcoding/eval_dataset/ioi/ioi25_metadata.json"
+    if eval_type == "ioi24":
+        eval_args = "++eval_type=ioi ++eval_config.dataset=ioi ++eval_config.test_file=/workspace/llmcoding/eval_dataset/ioi/ioi24_metadata.json"
     for code_input_file in code_input_files:
         # Use the provided path directly
         code_input_file = Path(code_input_file).absolute()
