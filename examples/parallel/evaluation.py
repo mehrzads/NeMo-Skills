@@ -49,6 +49,7 @@ def eval_status_file_exists(code_input_file: Union[str, Path], cluster: Union[st
 
     cluster_config = get_cluster_config(cluster)
     if cluster_config.get("executor") == "slurm":
+        print(f"Checking if {count_path} exists on remote cluster")
         return cluster_path_exists(cluster_config, count_path)
     return Path(count_path).exists()
 
