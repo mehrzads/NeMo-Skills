@@ -34,68 +34,60 @@ server_nodes = 1
 server_gpus = 1 # merge.py is likely CPU-bound
 merge_time_min = '04:00:00' # Adjust as needed for merge.py runtime
 
-def main( code_input_file: str,  cluster: str, eval_type: str):            
-    print(f"Code input file provided: {code_input_file}")
+eval_args = "++eval_type=ioi ++eval_config.dataset=ioi ++eval_config.test_file=/workspace/llmcoding/eval_dataset/ioi/ioi25_metadata.json"
+if eval_type == "ioi24":
+    eval_args = "++eval_type=ioi ++eval_config.dataset=ioi ++eval_config.test_file=/workspace/llmcoding/eval_dataset/ioi/ioi24_metadata.json"
+        
 
-    # Use the provided path directly
-    code_input_file = Path(code_input_file).absolute()
-    code_input_dir = code_input_file.parent
-    # Derive a base name from the directory path for job/file naming
-    # This assumes the last component of the path is the relevant experiment name
-    base_code_expname = code_input_file.name
-    print(f"Using base name '{base_code_expname}' derived from path for job/file naming.")
+def main( code_input_files: List[str],  cluster: str, eval_type: str):            
+    print(f"Code input file provided: {code_input_files}")
+    for code_input_file in code_input_files:
+        # Use the provided path directly
+        code_input_file = Path(code_input_file).absolute()
+        code_input_dir = code_input_file.parent
+        # Derive a base name from the directory path for job/file naming
+        # This assumes the last component of the path is the relevant experiment name
+        base_code_expname = code_input_file.name
+        print(f"Using base name '{base_code_expname}' derived from path for job/file naming.")
 
-    eval_args = "++eval_type=ioi ++eval_config.dataset=ioi ++eval_config.test_file=/workspace/llmcoding/eval_dataset/ioi/ioi25_metadata.json"
-    if eval_type == "ioi24":
-        eval_args = "++eval_type=ioi ++eval_config.dataset=ioi ++eval_config.test_file=/workspace/llmcoding/eval_dataset/ioi/ioi24_metadata.json"
+        print(f"\n--- Processing Evaluation for Run ---")
+
+        # Define unique names for this filter job and its output file
+        eval_job_expname = f"{base_code_expname}_eval_run"
+        # Log directory for this specific filter job, inside the main inference output dir
+        eval_log_dir = code_input_dir / "eval_logs/"
+
+        print(f"  Evaluation Job Name: {eval_job_expname}")
+        print(f"  Evaluation Log Directory: {eval_log_dir}")
+
+        # Command to run filter.py
+        eval_command = (
+            f"sleep 120 && python -m nemo_skills.evaluation.evaluate_results "
+            f"    ++input_files={code_input_file} " 
+            f"    {eval_args}"
+        )        
+        
+
+        run_cmd(
+            ctx=wrap_arguments(""), # No hydra overrides needed for this simple script dispatch
+            cluster=cluster,
+            command=eval_command,
+            expname=eval_job_expname,
+            log_dir=str(eval_log_dir),
+            num_nodes=server_nodes,
+            num_gpus=server_gpus,
+            with_sandbox=True,
+            get_random_port=True,
+            time_min=merge_time_min,
+        )
     
-   
-    print(f"\n--- Processing Evaluation for Run ---")
-
-    # Define unique names for this filter job and its output file
-    eval_job_expname = f"{base_code_expname}_eval_run"
-    # Log directory for this specific filter job, inside the main inference output dir
-    eval_log_dir = code_input_dir / "eval_logs/"
-
-    print(f"  Evaluation Job Name: {eval_job_expname}")
-    print(f"  Evaluation Log Directory: {eval_log_dir}")
-
-    # Command to run filter.py
-    eval_command = (
-        f"sleep 120 && python -m nemo_skills.evaluation.evaluate_results "
-        f"    ++input_files={code_input_file} "
-        f"    {eval_args}"
-    )
-    
-    wait_for_sandbox = (
-                        "export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-                        "cd /nemo_run/code && "
-                        f"echo 'Waiting for sandbox at ${'{'}NEMO_SKILLS_SANDBOX_HOST:-127.0.0.1{'}'}:6000' && "
-                        f"while [ $(curl -s -o /dev/null http://${'{'}NEMO_SKILLS_SANDBOX_HOST:-127.0.0.1{'}'}:6000/execute; echo $?) -ne 0 ]; do sleep 3; done && "
-                    )
-    #eval_command = wait_for_sandbox + eval_command
-    
-
-    run_cmd(
-        ctx=wrap_arguments(""), # No hydra overrides needed for this simple script dispatch
-        cluster=cluster,
-        command=eval_command,
-        expname=eval_job_expname,
-        log_dir=str(eval_log_dir),
-        num_nodes=server_nodes,
-        num_gpus=server_gpus,
-        with_sandbox=True,
-        get_random_port=True,
-        time_min=merge_time_min,
-    )
-   
     print(f"--- Submitted Evaluation Job for Run --- (Cluster: {cluster})")
 
     print("\nAll evaluation jobs submitted.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run evaluation by merging inference outputs.")
-    parser.add_argument("--code_input_file", type=str, required=True, 
+    parser.add_argument("--code_input_files", type=str, required=True, nargs='+', 
                         help="The full path to the directory containing inference outputs.")
     parser.add_argument("--cluster", type=str, default="oci-ord-mz", 
                         help="Cluster to run the merge jobs on (e.g., oci-ord-mz, eos-mz). Default: oci-ord-mz")
@@ -105,8 +97,8 @@ if __name__ == "__main__":
     
     args, unknown_args = parser.parse_known_args()
 
-    if not args.code_input_file:
+    if not args.code_input_files:
         print("Error: Code input file path cannot be empty.")
         sys.exit(1)
         
-    main(args.code_input_file, args.cluster, args.eval_type)
+    main(args.code_input_files, args.cluster, args.eval_type)

@@ -16,6 +16,7 @@ import json
 import multiprocessing
 import os
 import re
+import sys
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
 from nemo_skills.file_utils import jdump
@@ -199,6 +200,17 @@ def add_includes(code: str, problem_id: str) -> str:
     return code_header + code + ("\n" + dummy if dummy else "")
 
 
+def _print_progress_bar(completed_count: int, total_count: int) -> None:
+    try:
+        completed_count = max(0, min(completed_count, total_count))
+        bar = "x" * completed_count + "." * (total_count - completed_count)
+        sys.stdout.write(f"[{bar}] {completed_count}/{total_count}\r")
+        sys.stdout.flush()
+    except Exception:
+        # Best-effort progress bar; ignore any stdout errors
+        pass
+
+
 def eval_ioi(cfg):
     eval_config = IOIEvaluatorConfig(_init_nested=True, **cfg.eval_config)
     sandbox = LocalSandbox()
@@ -241,8 +253,27 @@ def eval_ioi(cfg):
                 f"individual code samples."
             )
 
+        # Progress/status handling
+        status_file = f"{jsonl_file}.count"
+        initial_completed = 0
+        if os.path.exists(status_file):
+            try:
+                with open(status_file, "rt") as sf:
+                    content = sf.read()
+                    initial_completed = content.count("x")
+            except Exception:
+                initial_completed = 0
+        initial_completed = max(0, min(initial_completed, len(samples)))
+
+        # Initial progress bar draw
+        _print_progress_bar(initial_completed, len(samples))
+
         outputs = []
-        for x, entry in enumerate(samples):
+        # Track which indices we updated so we can write back correctly on resume
+        updated_indices_to_results = {}
+        processed_since_start = 0
+
+        for x, entry in enumerate(samples[initial_completed:], start=initial_completed):
             print(f"Evaluating {x}/{len(samples)}")
             completion = extract_final_cpp_block(entry["generation"])
             completion = add_includes(completion, entry["ioi_id"])
@@ -297,9 +328,24 @@ def eval_ioi(cfg):
                     "test_case_results": test_case_results,
                 }
             )
+            updated_indices_to_results[x] = test_case_results
 
-        for s, o in zip(samples, outputs):
-            s["test_case_results"] = o["test_case_results"]
+            # Update status file and progress bar
+            try:
+                with open(status_file, "at") as sf:
+                    sf.write("x")
+            except Exception:
+                pass
+            processed_since_start += 1
+            _print_progress_bar(initial_completed + processed_since_start, len(samples))
+
+        # Finish progress bar line with newline
+        if len(samples) > 0:
+            sys.stdout.write("\n")
+
+        # Write only updated indices back to samples (supports resume)
+        for idx, result in updated_indices_to_results.items():
+            samples[idx]["test_case_results"] = result
         jdump(samples, jsonl_file, mode="wt")
 
         total_passed = 0
@@ -308,7 +354,15 @@ def eval_ioi(cfg):
             for subtask_result in o["test_case_results"].values():
                 if subtask_result["score"] > 0:
                     total_passed += 1
-        print(f"Subtasks passed: {total_passed} out of {total_problems * len(metadata[o['name']])}")
+        if total_problems > 0:
+            try:
+                example_name = outputs[0]["name"]
+                total_subtasks_per_problem = len(metadata[example_name])
+            except Exception:
+                total_subtasks_per_problem = 0
+            print(f"Subtasks passed: {total_passed} out of {total_problems * total_subtasks_per_problem}")
+        else:
+            print("Subtasks passed: 0 out of 0")
 
     pool.close()
     pool.join()
