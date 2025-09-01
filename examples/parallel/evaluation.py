@@ -24,7 +24,7 @@ import argparse # Import argparse
 from nemo_skills.pipeline.cli import wrap_arguments, run_cmd
 from nemo_skills.pipeline.eval import eval
 from nemo_skills.pipeline.utils.cluster import get_cluster_config, cluster_path_exists
-
+from nemo_skills.pipeline.utils.mounts import get_unmounted_path
 
 
 
@@ -44,14 +44,16 @@ def eval_status_file_exists(code_input_file: Union[str, Path], cluster: Union[st
     cluster executor is Slurm, checks existence via the SSH tunnel on the
     remote filesystem; otherwise checks locally.
     """
+    cluster_config = get_cluster_config(cluster)
     p = Path(code_input_file)
     count_path = str(p) + ".eval.done"
+    unmounted_path = get_unmounted_path(cluster_config, count_path)
 
-    cluster_config = get_cluster_config(cluster)
+    unmounted_path = str(unmounted_path)
     if cluster_config.get("executor") == "slurm":
-        print(f"Checking if {count_path} exists on remote cluster")
-        return cluster_path_exists(cluster_config, count_path)
-    return Path(count_path).exists()
+        print(f"Checking if {unmounted_path} exists on remote cluster")
+        return cluster_path_exists(cluster_config, unmounted_path)
+    return Path(unmounted_path).exists()
 
 
 def main( code_input_files: List[str],  cluster: str, eval_type: str):            
