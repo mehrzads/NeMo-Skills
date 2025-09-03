@@ -32,7 +32,7 @@ codegen_root = "/nemo_run/code/"
 
 # Server settings for merge job (can be minimal if merge.py is lightweight)
 server_nodes = 1
-server_gpus = 1 # merge.py is likely CPU-bound
+server_gpus = 0 # merge.py is likely CPU-bound
 merge_time_min = '04:00:00' # Adjust as needed for merge.py runtime
         
 
@@ -102,6 +102,7 @@ def main( code_input_files: List[str],  cluster: str, eval_type: str):
             num_gpus=server_gpus,
             with_sandbox=True,
             get_random_port=True,
+            exclusive=True,
             time_min=merge_time_min,
         )
     
