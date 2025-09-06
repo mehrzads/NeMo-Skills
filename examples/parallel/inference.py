@@ -61,6 +61,13 @@ def main(config: MainConfig):
         server_gpus = 8
         server_args = "--async-scheduling --max-num-seqs=1024" # Aligned with evaluation.py
         current_overrides += extra_overrides
+    elif config.model_name == "ocr2_py_cpp_gpt_oss_120b_distill_qwen_32b_120k":
+        # vLLM server settings
+        prompt_template = "qwen-instruct"
+        server_type = 'vllm'
+        server_nodes = 1
+        server_gpus = 8
+        server_args = "--rope-scaling '{\\\"rope_type\\\":\\\"yarn\\\",\\\"factor\\\":4.0,\\\"original_max_position_embeddings\\\":32768}' --max-model-len 131072"# Aligned with evaluation.py
     else:
         # vLLM server settings
         prompt_template = "qwen-instruct"
