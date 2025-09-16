@@ -63,6 +63,9 @@ def eval_status_file_exists(code_input_file: Union[str, Path], cluster: Union[st
 def main( code_input_files: List[str],  cluster: str, ref_file: str, test_file: str):            
     for code_input_file in code_input_files:
         print(f"Code input file provided: {code_input_file}")
+        if eval_status_file_exists(code_input_file, cluster):
+            print(f"Evaluation already done for {code_input_file}")
+            continue
 
         # Use the provided path directly
         code_input_file = Path(code_input_file).absolute()

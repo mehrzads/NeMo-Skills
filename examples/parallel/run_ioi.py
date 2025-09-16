@@ -263,7 +263,7 @@ def eval_ioi(input_files, ref_file, test_file):
         
           # Output file
         base_json_path, _ = os.path.splitext(jsonl_file)
-        output_file = f"{base_json_path}_results.json"  
+        output_file = f"{base_json_path}_results.jsonl"  
         initial_completed = 0
         if os.path.exists(output_file):
             #check if each line is a valid json
