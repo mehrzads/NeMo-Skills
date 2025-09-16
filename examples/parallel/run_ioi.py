@@ -224,35 +224,58 @@ def extract_input_secret(grader_files):
     return None
 
 
-def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
+def eval_ioi(input_files, ref_file, test_file):
     cfg_eval = {}
     cfg_sandbox = {}
     eval_config = IOIEvaluatorConfig(_init_nested=True, **cfg_eval)
     sandbox = LocalSandbox(**cfg_sandbox)
     batch_size = eval_config.test_batch_size
-    if not os.path.exists(ref_file):
-        raise ValueError(f"Failed to find test cases in eval dataset directory: {ref_file}")
-    with open(ref_file) as f:
-        for line in f:
-            ref_data = json.loads(line)            
-            
-
     if not os.path.exists(test_file):
         raise ValueError(f"Failed to find test cases in eval dataset directory: {test_file}")
 
     with open(test_file) as f:
         metadata = json.load(f)
 
+    if not os.path.exists(ref_file):
+        raise ValueError(f"Failed to find test cases in eval dataset directory: {ref_file}")
+            
+
+   
     pool = multiprocessing.Pool(processes=batch_size, initializer=init_worker, initargs=(sandbox,))
 
     for jsonl_file in unroll_files(input_files):
         samples = []
         with open(jsonl_file) as f:
             sample = json.load(f)
-
+        
+        id = sample['id']        
+        #this part is bad and should be fixed
+        ref_data = None
+        with open(ref_file) as f:
+            for line in f:
+                ref_data_line = json.loads(line)  
+                if ref_data_line['id'] == id:
+                    ref_data = ref_data_line
+                    print(f"Found ref data for {id}")
+                    break
+            if ref_data is None:
+                raise ValueError(f"Failed to find ref data for {id} in {ref_file}")
+        
+          # Output file
+        base_json_path, _ = os.path.splitext(jsonl_file)
+        output_file = f"{base_json_path}_results.json"  
+        initial_completed = 0
+        if os.path.exists(output_file):
+            #check if each line is a valid json
+            with open(output_file, "rt") as f:
+                for line in f:
+                    #count the number of lines in the file
+                    initial_completed += 1
+                    if not json.loads(line):
+                        raise ValueError(f"Invalid JSON line in {output_file}: {line}")
+            
 
         
-        id = sample['id']
         ioi_id = sample['ioi_id']
         run_code = ref_data['run']
         grader_files = ref_data['grader_files']
@@ -262,11 +285,11 @@ def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
         print(f"Input secret: {input_secret}")
         print(f"Evaluating {id} {ioi_id}")
         print(f"Run code: {len(code_list)}")
-        per_code_results = {}
-        _slice_end = min(end_idx, len(code_list))
-        _slice_len = max(0, _slice_end - start_idx)
-        for x, code in enumerate(code_list[start_idx:_slice_end]):
-            abs_x = x + start_idx
+        
+        _slice_end = len(code_list)
+        _slice_len = max(0, _slice_end)
+        for x, code in enumerate(code_list[initial_completed:_slice_end]):
+            abs_x = x 
             print(f"Evaluating {x}/{_slice_len}")
             completion = add_includes(code, ioi_id)
             # Resolve key in metadata robustly: try numeric id, string id, ioi_id
@@ -283,8 +306,7 @@ def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
                     f"Unable to find tests for id={id} or ioi_id={ioi_id} in test metadata. "
                     f"Available keys preview: {available_keys_preview}"
                 )
-            test_items = metadata[metadata_key]
-            code_results = []
+            test_items = metadata[metadata_key]            
             for i in range(0, len(test_items), batch_size):
                 batch = test_items[i:i + batch_size]
                 tasks = []
@@ -300,13 +322,14 @@ def eval_ioi(input_files, ref_file, test_file, start_idx, end_idx):
                         }
                         tasks.append((task_args, local_idx))
                 results = pool.starmap(run_test_case, tasks)
-                code_results.extend(results)
-            per_code_results[str(abs_x)] = code_results
-
+                final_results = {}
+                final_results["run_id"] = abs_x
+                final_results["results"] = results
+                with open(output_file, "at") as f:
+                   f.write(json.dumps(final_results) + "\n")
+                
         
-        base_json_path, _ = os.path.splitext(jsonl_file)
-        with open(f"{base_json_path}_results.json", "wt") as f:
-            json.dump(per_code_results, f)
+    open(output_file + ".done", "w").close()
 
     pool.close()
     pool.join()
@@ -333,18 +356,7 @@ def main():
         default="/workspace/llmcoding/eval_dataset/ioi24/test_metadata.json",
         help="Path to IOI test metadata JSON (defaults to the dataset's test file).",
     )
-    parser.add_argument(
-        "--start_idx",
-        type=int,
-        default=0,
-        help="Start index for the evaluation.",
-    )
-    parser.add_argument(
-        "--end_idx",
-        type=int,
-        default=1000,
-        help="End index for the evaluation.",
-    )
+   
     args = parser.parse_args()
 
     # Support comma-separated items passed as a single token
@@ -352,7 +364,7 @@ def main():
     for token in args.input_files:
         raw_inputs.extend([part for part in token.split(',') if part])
 
-    eval_ioi(raw_inputs, args.ref_file, args.test_file, args.start_idx, args.end_idx) 
+    eval_ioi(raw_inputs, args.ref_file, args.test_file) 
 
 
 if __name__ == "__main__":

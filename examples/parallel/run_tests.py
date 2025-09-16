@@ -21,6 +21,8 @@ from pathlib import Path
 from typing import List, Dict
 import re # Keep re import
 import argparse # Import argparse
+from nemo_skills.pipeline.utils.cluster import get_cluster_config, cluster_path_exists
+from nemo_skills.pipeline.utils.mounts import get_unmounted_path
 from nemo_skills.pipeline.cli import wrap_arguments, run_cmd
 from nemo_skills.pipeline.eval import eval
 
@@ -31,55 +33,79 @@ codegen_root = "/nemo_run/code/"
 
 # Server settings for merge job (can be minimal if merge.py is lightweight)
 server_nodes = 1
-server_gpus = 1 # merge.py is likely CPU-bound
+server_gpus = 0 # merge.py is likely CPU-bound
 merge_time_min = "04:00:00" # Adjust as needed for merge.py runtime
 
-def main( code_input_file: str,  cluster: str, ref_file: str, test_file: str, start_idx: int, end_idx: int):            
-    print(f"Code input file provided: {code_input_file}")
+def eval_status_file_exists(code_input_file: Union[str, Path], cluster: Union[str, Dict, None] = None) -> bool:
+    """
+    Check if the progress count file exists for the given input file.
 
-    # Use the provided path directly
+    Uses the convention "<jsonl_file>.count" from the evaluator. If the
+    cluster executor is Slurm, checks existence via the SSH tunnel on the
+    remote filesystem; otherwise checks locally.
+    """
+    cluster_config = get_cluster_config(cluster)
     code_input_file = Path(code_input_file).absolute()
     code_input_dir = code_input_file.parent
-    # Derive a base name from the directory path for job/file naming
-    # This assumes the last component of the path is the relevant experiment name
-    base_code_expname = code_input_file.name
-    print(f"Using base name '{base_code_expname}' derived from path for job/file naming.")
+        
+    base_json_path, _ = os.path.splitext(code_input_file)
+    output_file = f"{base_json_path}_results.jsonl.done" 
+    count_path = str(code_input_dir) + "/" + output_file
+    print(f"Checking if {count_path} exists on remote cluster")
+    unmounted_path = get_unmounted_path(cluster_config, count_path)
 
-   
-    print(f"\n--- Processing Evaluation for Run ---")
+    unmounted_path = str(unmounted_path)
+    if cluster_config.get("executor") == "slurm":
+        print(f"Checking if {unmounted_path} exists on remote cluster")
+        return cluster_path_exists(cluster_config, unmounted_path)
+    return Path(unmounted_path).exists()
 
-    # Define unique names for this filter job and its output file
-    eval_job_expname = f"{base_code_expname}_eval_run"
-    # Log directory for this specific filter job, inside the main inference output dir
-    eval_log_dir = code_input_dir / "eval_logs/"
+def main( code_input_files: List[str],  cluster: str, ref_file: str, test_file: str):            
+    for code_input_file in code_input_files:
+        print(f"Code input file provided: {code_input_file}")
 
-    print(f"  Evaluation Job Name: {eval_job_expname}")
-    print(f"  Evaluation Log Directory: {eval_log_dir}")
+        # Use the provided path directly
+        code_input_file = Path(code_input_file).absolute()
+        code_input_dir = code_input_file.parent
+        # Derive a base name from the directory path for job/file naming
+        # This assumes the last component of the path is the relevant experiment name
+        base_code_expname = code_input_file.name
+        print(f"Using base name '{base_code_expname}' derived from path for job/file naming.")
 
-    # Command to run filter.py
-    eval_command = (
-        f"sleep 120 && cd /nemo_run/code/examples/parallel/ && python run_ioi.py "
-        f"    --input_files={code_input_file} "
-        f"    --ref_file={ref_file} "
-        f"    --test_file={test_file} "
-        f"    --start_idx={start_idx} "
-        f"    --end_idx={end_idx} "
-    )
     
-    
+        print(f"\n--- Processing Evaluation for Run ---")
 
-    run_cmd(
-        ctx=wrap_arguments(""), # No hydra overrides needed for this simple script dispatch
-        cluster=cluster,
-        command=eval_command,
-        expname=eval_job_expname,
-        log_dir=str(eval_log_dir),
-        num_nodes=server_nodes,
-        num_gpus=server_gpus,
-        with_sandbox=True,
-        get_random_port=True,
-        time_min=merge_time_min,
-    )
+        # Define unique names for this filter job and its output file
+        eval_job_expname = f"{base_code_expname}_eval_run"
+        # Log directory for this specific filter job, inside the main inference output dir
+        eval_log_dir = code_input_dir / "eval_logs/"
+
+        print(f"  Evaluation Job Name: {eval_job_expname}")
+        print(f"  Evaluation Log Directory: {eval_log_dir}")
+
+        # Command to run filter.py
+        eval_command = (
+            f"sleep 240 && cd /nemo_run/code/examples/parallel/ && python run_ioi.py "
+            f"    --input_files={code_input_file} "
+            f"    --ref_file={ref_file} "
+            f"    --test_file={test_file} "       
+        )
+        
+        
+
+        run_cmd(
+            ctx=wrap_arguments(""), # No hydra overrides needed for this simple script dispatch
+            cluster=cluster,
+            command=eval_command,
+            expname=eval_job_expname,
+            log_dir=str(eval_log_dir),
+            num_nodes=server_nodes,
+            num_gpus=server_gpus,
+            with_sandbox=True,
+            get_random_port=True,
+            exclusive=True,
+            time_min=merge_time_min,
+        )
    
     print(f"--- Submitted Evaluation Job for Run --- (Cluster: {cluster})")
 
@@ -87,7 +113,7 @@ def main( code_input_file: str,  cluster: str, ref_file: str, test_file: str, st
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run evaluation by merging inference outputs.")
-    parser.add_argument("--code_input_file", type=str, required=True, 
+    parser.add_argument("--code_input_files", type=str, required=True, nargs='+', 
                         help="The full path to the directory containing inference outputs.")
     parser.add_argument("--cluster", type=str, default="oci-ord-mz", 
                         help="Cluster to run the merge jobs on (e.g., oci-ord-mz, eos-mz). Default: oci-ord-mz")
@@ -95,14 +121,11 @@ if __name__ == "__main__":
                         help="The full path to the reference file.")
     parser.add_argument("--test_file", type=str, required=True, 
                         help="The full path to the test file.")
-    parser.add_argument("--start_idx", type=int, default=0, 
-                        help="The start index for the evaluation.")
-    parser.add_argument("--end_idx", type=int, default=1000, 
-                        help="The end index for the evaluation.")
+    
     args, unknown_args = parser.parse_known_args()
 
-    if not args.code_input_file:
+    if not args.code_input_files:
         print("Error: Code input file path cannot be empty.")
         sys.exit(1)
         
-    main(args.code_input_file, args.cluster, args.ref_file, args.test_file, args.start_idx, args.end_idx)
+    main(args.code_input_files, args.cluster, args.ref_file, args.test_file)
