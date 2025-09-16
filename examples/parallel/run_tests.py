@@ -50,7 +50,7 @@ def eval_status_file_exists(code_input_file: Union[str, Path], cluster: Union[st
         
     base_json_path, _ = os.path.splitext(code_input_file)
     output_file = f"{base_json_path}_results.jsonl.done" 
-    count_path = str(code_input_dir) + "/" + output_file
+    count_path =  output_file
     print(f"Checking if {count_path} exists on remote cluster")
     unmounted_path = get_unmounted_path(cluster_config, count_path)
 
