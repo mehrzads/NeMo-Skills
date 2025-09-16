@@ -292,6 +292,12 @@ def eval_ioi(input_files, ref_file, test_file):
             abs_x = x 
             print(f"Evaluating {x}/{_slice_len}")
             completion = add_includes(code, ioi_id)
+            add_data = ""
+            if ioi_id == "triples":
+                if id in {7, 8, 9, 10, 11, 12}:
+                    add_data = "1\n"
+                else:
+                    add_data = "2\n"
             # Resolve key in metadata robustly: try numeric id, string id, ioi_id
             metadata_key = None
             if isinstance(metadata, dict):
@@ -317,7 +323,7 @@ def eval_ioi(input_files, ref_file, test_file):
                             "grader_files": grader_files,
                             "run_code": run_code,
                             "compile_code": compile_code,
-                            "test_input": ((input_secret + "\n") if input_secret else "") + test_data['content'],
+                            "test_input": ((input_secret + "\n") if input_secret else "") + add_data + test_data['content'],
                             
                         }
                         tasks.append((task_args, local_idx))
