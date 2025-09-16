@@ -26,8 +26,8 @@ from nemo_skills.utils import nested_dataclass, unroll_files
 @nested_dataclass(kw_only=True)
 class IOIEvaluatorConfig:
     dataset: str = "ioi"
-    num_workers: int = 4  # number of test workers
-    test_batch_size: int = 5  # number of tests to run concurrently
+    num_workers: int = 16  # number of test workers
+    test_batch_size: int = 16 # number of tests to run concurrently
     # where test cases are stored in automatically mounted eval datasets folder.
     test_file: str = "/eval_dataset/ioi24/test_metadata.json"
 
@@ -289,7 +289,7 @@ def eval_ioi(input_files, ref_file, test_file):
         _slice_end = len(code_list)
         _slice_len = max(0, _slice_end)
         for x, code in enumerate(code_list[initial_completed:_slice_end]):
-            abs_x = x 
+            abs_x = x + initial_completed
             print(f"Evaluating {x}/{_slice_len}")
             completion = add_includes(code, ioi_id)
             add_data = ""
