@@ -18,7 +18,7 @@
 import os
 import sys
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Union
 import re # Keep re import
 import argparse # Import argparse
 from nemo_skills.pipeline.utils.cluster import get_cluster_config, cluster_path_exists
