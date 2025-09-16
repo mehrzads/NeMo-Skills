@@ -290,7 +290,7 @@ def eval_ioi(input_files, ref_file, test_file):
         _slice_len = max(0, _slice_end)
         for x, code in enumerate(code_list[initial_completed:_slice_end]):
             abs_x = x + initial_completed
-            print(f"Evaluating {x}/{_slice_len}")
+            print(f"Evaluating {abs_x}/{_slice_len}")
             completion = add_includes(code, ioi_id)
             add_data = ""
             if ioi_id == "triples":
