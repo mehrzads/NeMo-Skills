@@ -313,6 +313,7 @@ def eval_ioi(input_files, ref_file, test_file):
                     f"Available keys preview: {available_keys_preview}"
                 )
             test_items = metadata[metadata_key]            
+            total_results = []
             for i in range(0, len(test_items), batch_size):
                 batch = test_items[i:i + batch_size]
                 tasks = []
@@ -328,11 +329,13 @@ def eval_ioi(input_files, ref_file, test_file):
                         }
                         tasks.append((task_args, local_idx))
                 results = pool.starmap(run_test_case, tasks)
-                final_results = {}
-                final_results["run_id"] = abs_x
-                final_results["results"] = results
-                with open(output_file, "at") as f:
-                   f.write(json.dumps(final_results) + "\n")
+                total_results.extend(results)
+
+            final_results = {}
+            final_results["run_id"] = abs_x
+            final_results["results"] = total_results
+            with open(output_file, "at") as f:
+                f.write(json.dumps(final_results) + "\n")
                 
         
     open(output_file + ".done", "w").close()
