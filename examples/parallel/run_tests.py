@@ -94,7 +94,7 @@ def main( code_input_files: List[str],  cluster: str, ref_file: str, test_file: 
             f"    --test_file={test_file} "       
         )
         
-        for i in range(6):
+        for i in range(3):
             eval_job_expname = f"{base_code_expname}_eval_run_{i}"
             prev_eval_job_expname = f"{base_code_expname}_eval_run_{i-1}"
             run_cmd(
