@@ -91,7 +91,7 @@ def main( code_input_files: List[str],  cluster: str, eval_type: str):
             f"    {eval_args}"
         )        
         
-        for i in range(3):
+        for i in range(0):
             eval_job_expname = f"{base_code_expname}_eval_run_{i}"
             prev_eval_job_expname = f"{base_code_expname}_eval_run_{i-1}"
             run_cmd(
