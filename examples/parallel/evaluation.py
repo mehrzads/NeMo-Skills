@@ -91,23 +91,21 @@ def main( code_input_files: List[str],  cluster: str, eval_type: str):
             f"    {eval_args}"
         )        
         
-        for i in range(6):
-            eval_job_expname = f"{base_code_expname}_eval_run_{i}"
-            prev_eval_job_expname = f"{base_code_expname}_eval_run_{i-1}"
-            run_cmd(
-                ctx=wrap_arguments(""), # No hydra overrides needed for this simple script dispatch
-                cluster=cluster,
-                command=eval_command,
-                expname=eval_job_expname,
-                log_dir=str(eval_log_dir),
-                num_nodes=server_nodes,
-                num_gpus=server_gpus,
-                with_sandbox=True,
-                get_random_port=True,
-                run_after=[prev_eval_job_expname],
-                #exclusive=True,
-                time_min=merge_time_min,
-            )
+
+        eval_job_expname = f"{base_code_expname}_eval_run"
+        run_cmd(
+            ctx=wrap_arguments(""), # No hydra overrides needed for this simple script dispatch
+            cluster=cluster,
+            command=eval_command,
+            expname=eval_job_expname,
+            log_dir=str(eval_log_dir),
+            num_nodes=server_nodes,
+            num_gpus=server_gpus,
+            with_sandbox=True,
+            get_random_port=True,
+            #exclusive=True,
+            time_min=merge_time_min,
+        )
     
     print(f"--- Submitted Evaluation Job for Run --- (Cluster: {cluster})")
 
