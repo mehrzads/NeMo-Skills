@@ -233,7 +233,9 @@ def get_executor(
         timeout = cluster_config["timeouts"][partition]
 
     additional_parameters = {"time_min": time_min} if time_min is not None else {}
-    additional_parameters["extra_sbatch_args"] = cluster_config.get("extra_sbatch_args", [])
+    if cluster_config.get("nv-meta", None) is not None:
+        additional_parameters["nv-meta"] = cluster_config.get("nv-meta", None)
+    
     if cluster_config.get("mail_type") is not None:
         additional_parameters["mail_type"] = cluster_config["mail_type"]
     if cluster_config.get("mail_user") is not None:
