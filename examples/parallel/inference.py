@@ -53,7 +53,7 @@ def main(config: MainConfig):
         server_gpus = 8
         server_args = "--load-format sharded_state --tensor-parallel-size=16" # Aligned with evaluation.py
 
-    elif config.model_name == "gpt-oss-120b":
+    elif config.model_name == "gpt-oss-120b" or config.model_name == "gpt-oss-20b":
         # vLLM server settings
         prompt_template = "gpt-oss-high"
         server_type = 'vllm'
@@ -109,7 +109,7 @@ def main(config: MainConfig):
         cur_output_dir = f"{config.output_dir.rstrip('/')}/{cur_stem}"
         cur_expname = f"{cur_stem}-{expname}"
 
-        if config.model_name == "gpt-oss-120b":
+        if config.model_name == "gpt-oss-120b" or config.model_name == "gpt-oss-20b":
             generate(
                 ctx=ctx,
                 generation_type=config.generation_type,
@@ -121,6 +121,7 @@ def main(config: MainConfig):
                 server_type=server_type,
                 server_gpus=server_gpus,
                 server_nodes=server_nodes,
+                server_args=server_args,
                 num_random_seeds=config.num_runs,
                 time_min="04:00:00",
                 with_sandbox=True,
@@ -139,7 +140,7 @@ def main(config: MainConfig):
                 server_nodes=server_nodes,
                 server_args=server_args,
                 num_random_seeds=config.num_runs,
-                time_min="00:30:00",
+                time_min="04:00:00",
                 # set these according to your cluster configuration
                 # num_chunks=N,
                 # dependent_jobs=M,
