@@ -86,7 +86,7 @@ def main( code_input_files: List[str],  cluster: str, eval_type: str):
 
         # Command to run filter.py
         eval_command = (
-            f"sleep 240 && python -m nemo_skills.evaluation.evaluate_results "
+            f"sleep 300 && python -m nemo_skills.evaluation.evaluate_results "
             f"    ++input_files={code_input_file} " 
             f"    {eval_args}"
         )        
