@@ -240,16 +240,28 @@ def get_executor(
         additional_parameters["mail_type"] = cluster_config["mail_type"]
     if cluster_config.get("mail_user") is not None:
         additional_parameters["mail_user"] = cluster_config["mail_user"]
-    srun_args = [
-        "--no-container-mount-home",
-        "--mpi=pmix",
-        "--wait=10",
-        # we need to be explicit about this in srun as commands might need to run in parallel
-        f"--ntasks-per-node={tasks_per_node}",
-        f"--nodes={num_nodes}",
-        # NeMo-run should take care of this, but we'll put it here temporarily
-        f"--container-env={','.join([k.strip() for k in env_vars.keys()])}",
-    ]
+    if additional_parameters.get("nv-meta", None) is not None:
+        srun_args = [
+            "--no-container-mount-home",
+            "--mpi=pmix",
+            "--wait=10",
+            # we need to be explicit about this in srun as commands might need to run in parallel
+            f"--ntasks-per-node={tasks_per_node}",
+            f"--nodes={num_nodes}",
+            # NeMo-run should take care of this, but we'll put it here temporarily
+            f"--export={','.join([k.strip() for k in env_vars.keys()])}",
+        ]
+    else:
+        srun_args = [
+            "--no-container-mount-home",
+            "--mpi=pmix",
+            "--wait=10",
+            # we need to be explicit about this in srun as commands might need to run in parallel
+            f"--ntasks-per-node={tasks_per_node}",
+            f"--nodes={num_nodes}",
+            # NeMo-run should take care of this, but we'll put it here temporarily
+            f"--container-env={','.join([k.strip() for k in env_vars.keys()])}",
+        ]
     if overlap:
         srun_args.append("--overlap")
     if not cluster_config.get("disable_gpus_per_node", False) and gpus_per_node is not None:
