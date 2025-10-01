@@ -187,15 +187,18 @@ def eval_testdatasets(input_files, ref_file, test_file):
     for jsonl_file in unroll_files(input_files):
         samples = []
         with open(jsonl_file) as f:
-            sample = json.load(f)
+            for line in f:
+                samples.append(json.loads(line))
         
-        id = sample['id']        
+        sample = samples[0]        
+        id = sample['id']   
+        ioi_id = sample['ioi_id']
         #this part is bad and should be fixed
         ref_data = None
         with open(ref_file) as f:
             for line in f:
                 ref_data_line = json.loads(line)  
-                if ref_data_line['id'] == id:
+                if ref_data_line['ioi_id'] == ioi_id:
                     ref_data = ref_data_line
                     print(f"Found ref data for {id}")
                     break
@@ -217,7 +220,6 @@ def eval_testdatasets(input_files, ref_file, test_file):
             
 
         
-        ioi_id = sample['ioi_id']
         run_files = ref_data['run_files']
         code_list = sample['code_list']
         print(f"Evaluating {id} {ioi_id}")
