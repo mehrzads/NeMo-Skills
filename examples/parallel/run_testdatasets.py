@@ -186,10 +186,10 @@ def eval_testdatasets(input_files, ref_file, test_file):
 
     for jsonl_file in unroll_files(input_files):
         samples = []
-        with open(jsonl_file) as f:
-            for line in f:
-                samples.append(json.loads(line))
-        
+         with open(jsonl_file) as f:
+            sample = json.load(f)
+            
+           
         sample = samples[0]        
         id = sample['id']   
         ioi_id = sample['ioi_id']

@@ -88,7 +88,7 @@ def main( code_input_files: List[str],  cluster: str, ref_file: str, test_file: 
 
         # Command to run filter.py
         eval_command = (
-            f"sleep 240 && cd /nemo_run/code/examples/parallel/ && python run_testdatasets.py "
+            f"sleep 40 && cd /nemo_run/code/examples/parallel/ && python run_testdatasets.py "
             f"    --input_files={code_input_file} "
             f"    --ref_file={ref_file} "
             f"    --test_file={test_file} "       
