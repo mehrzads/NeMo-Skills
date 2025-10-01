@@ -218,7 +218,7 @@ def eval_testdatasets(input_files, ref_file, test_file):
                         raise ValueError(f"Invalid JSON line in {output_file}: {line}")
             
 
-        
+        print(f"ref_data keys: {list(ref_data.keys())}")
         run_files = ref_data['run_files']
         code_list = sample['code_list']
         print(f"Evaluating {id} {ioi_id}")
