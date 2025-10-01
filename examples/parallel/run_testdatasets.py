@@ -58,7 +58,11 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
 
         for filepath in run_files:
             filename= filepath["filename"]
-            content= filepath["content"]           
+            content= filepath["content"]   
+            if filename == "compile":
+            # If the file is "compile", replace -Wall with -w in its content
+            if isinstance(content, str):
+                content = content.replace("-Wall", "-w")
             file_creation_commands.append(f"""
 cat <<'_EOT_' > {unique_dir}/graders/{filename}
 {content}
@@ -104,7 +108,7 @@ _EOT_
         # 3. Run the code
         run_command = f"cd {unique_dir}/graders && chmod +x ./run && ./run < input.txt && rm -rf ../graders/"
         run_result, _ = worker_loop.run_until_complete(
-            worker_sandbox.execute_code(run_command, language='shell', timeout=120)
+            worker_sandbox.execute_code(run_command, language='shell', timeout=120, max_output_characters=1000000)
         )
 
         run_stdout = run_result.get('stdout', '')
