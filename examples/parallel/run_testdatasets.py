@@ -307,7 +307,7 @@ def main():
     for token in args.input_files:
         raw_inputs.extend([part for part in token.split(',') if part])
 
-    eval_ioi(raw_inputs, args.ref_file, args.test_file) 
+    eval_testdatasets(raw_inputs, args.ref_file, args.test_file)     
 
 
 if __name__ == "__main__":
