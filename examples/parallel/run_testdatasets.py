@@ -85,7 +85,7 @@ _EOT_
             raise Exception(f"File setup failed: {setup_result['stderr']}")
 
         # 2. Compile the code
-        compile_command = f"cd {unique_dir}/graders && ./compile.sh"
+        compile_command = f"cd {unique_dir}/graders && ./compile"
         compile_result, _ = worker_loop.run_until_complete(
             worker_sandbox.execute_code(compile_command, language='shell', timeout=120)
         )
@@ -102,7 +102,7 @@ _EOT_
             return result
 
         # 3. Run the code
-        run_command = f"cd {unique_dir}/graders && ./run.sh < input.txt"
+        run_command = f"cd {unique_dir}/graders && ./run < input.txt"
         run_result, _ = worker_loop.run_until_complete(
             worker_sandbox.execute_code(run_command, language='shell', timeout=120)
         )
