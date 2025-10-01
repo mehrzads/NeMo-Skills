@@ -60,9 +60,9 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             filename= filepath["filename"]
             content= filepath["content"]   
             if filename == "compile":
-            # If the file is "compile", replace -Wall with -w in its content
-            if isinstance(content, str):
-                content = content.replace("-Wall", "-w")
+                # If the file is "compile", replace -Wall with -w in its content
+                if isinstance(content, str):
+                    content = content.replace("-Wall", "-w")
             file_creation_commands.append(f"""
 cat <<'_EOT_' > {unique_dir}/graders/{filename}
 {content}
