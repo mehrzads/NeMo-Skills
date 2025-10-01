@@ -190,7 +190,6 @@ def eval_testdatasets(input_files, ref_file, test_file):
             sample = json.load(f)
             
            
-        sample = samples[0]        
         id = sample['id']   
         ioi_id = sample['ioi_id']
         #this part is bad and should be fixed
