@@ -102,7 +102,7 @@ _EOT_
             return result
 
         # 3. Run the code
-        run_command = f"cd {unique_dir}/graders && chmod +x ./run && ./run < input.txt && rm -f ../graders/"
+        run_command = f"cd {unique_dir}/graders && chmod +x ./run && ./run < input.txt && rm -rf ../graders/"
         run_result, _ = worker_loop.run_until_complete(
             worker_sandbox.execute_code(run_command, language='shell', timeout=120)
         )
