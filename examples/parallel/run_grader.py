@@ -34,7 +34,7 @@ codegen_root = "/nemo_run/code/"
 # Server settings for merge job (can be minimal if merge.py is lightweight)
 server_nodes = 1
 server_gpus = 1 # merge.py is likely CPU-bound
-merge_time_min = "00:20:00" # Adjust as needed for merge.py runtime
+merge_time_min = "04:00:00" # Adjust as needed for merge.py runtime
 
 def eval_status_file_exists(code_input_file: Union[str, Path], cluster: Union[str, Dict, None] = None) -> bool:
     """
@@ -88,13 +88,13 @@ def main( code_input_files: List[str],  cluster: str, ref_file: str, test_file: 
 
         # Command to run filter.py
         eval_command = (
-            f"sleep 40 && cd /nemo_run/code/examples/parallel/ && python run_testdatasets.py "
+            f"sleep 240 && cd /nemo_run/code/examples/parallel/ && python run_testdatasets.py "
             f"    --input_files={code_input_file} "
             f"    --ref_file={ref_file} "
             f"    --test_file={test_file} "       
         )
         
-        for i in range(1):
+        for i in range(3):
             eval_job_expname = f"{base_code_expname}_eval_run_{i}"
             prev_eval_job_expname = f"{base_code_expname}_eval_run_{i-1}"
             run_cmd(
