@@ -20,6 +20,7 @@ class MainConfig(BaseModel):
     num_runs: int
     local_model: bool
     top_p: float
+    num_chunks: int = 1
 def main(config: MainConfig):
    
    
@@ -104,6 +105,9 @@ def main(config: MainConfig):
         current_overrides += " ++num_generations={NUM_GENERATIONS} "
     current_overrides = current_overrides.format(**format_dict)
     ctx = wrap_arguments(current_overrides)
+    
+    # Ensure num_chunks is defined (default is 1)
+    num_chunks = config.num_chunks if hasattr(config, 'num_chunks') else 1
 
 
     for cur_input_file in config.input_files:
@@ -112,22 +116,41 @@ def main(config: MainConfig):
         cur_expname = f"{cur_stem}-{expname}"
 
         if config.model_name == "gpt-oss-120b" or config.model_name == "gpt-oss-20b":
-            generate(
-                ctx=ctx,
-                generation_type=config.generation_type,
-                cluster=config.cluster,
-                input_file=cur_input_file,
-                output_dir=cur_output_dir,
-                expname=cur_expname,
-                model=model_path,
-                server_type=server_type,
-                server_gpus=server_gpus,
-                server_nodes=server_nodes,
-                server_args=server_args,
-                num_random_seeds=config.num_runs,
-                time_min="04:00:00",
-                with_sandbox=True,
-            )
+            if num_chunks >1 :
+                generate(
+                    ctx=ctx,
+                    generation_type=config.generation_type,
+                    cluster=config.cluster,
+                    num_chunks=num_chunks,
+                    input_file=cur_input_file,
+                    output_dir=cur_output_dir,
+                    expname=cur_expname,
+                    model=model_path,
+                    server_type=server_type,
+                    server_gpus=server_gpus,
+                    server_nodes=server_nodes,
+                    server_args=server_args,
+                    num_random_seeds=config.num_runs,
+                    time_min="04:00:00",
+                    with_sandbox=True,
+                )
+            else:                
+                generate(
+                    ctx=ctx,
+                    generation_type=config.generation_type,
+                    cluster=config.cluster,
+                    input_file=cur_input_file,
+                    output_dir=cur_output_dir,
+                    expname=cur_expname,
+                    model=model_path,
+                    server_type=server_type,
+                    server_gpus=server_gpus,
+                    server_nodes=server_nodes,
+                    server_args=server_args,
+                    num_random_seeds=config.num_runs,
+                    time_min="04:00:00",
+                    with_sandbox=True,
+                )
         else:
             generate(
                 ctx=ctx,
@@ -181,6 +204,8 @@ if __name__ == "__main__":
                         help="Use local model path under /workspace/hf_models")
     parser.add_argument("--top_p", type=float, default=0.95,
                         help="Top p for inference")
+    parser.add_argument("--num_chunks", type=int, default=1,
+                        help="Number of chunks to split input; default 1")
     args, unknown = parser.parse_known_args()
 
     main_config_instance = MainConfig(
@@ -197,5 +222,6 @@ if __name__ == "__main__":
         num_runs=args.num_runs,
         local_model=args.local_model,
         top_p=args.top_p,
+        num_chunks=args.num_chunks,
     )
     main(main_config_instance)  
