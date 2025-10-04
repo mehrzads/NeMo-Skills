@@ -27,7 +27,6 @@ def main(config: MainConfig):
         " ++inference.temperature={INFERENCE_TEMPERATURE} "
         " ++inference.tokens_to_generate={TOKENS_TO_GENERATE} "     
         " ++prompt_config={PROMPT_CONFIG} "
-        " ++num_generations={NUM_GENERATIONS} "
         " ++skip_filled=True " 
         " ++inference.top_p={TOP_P} "       
     )
@@ -100,6 +99,9 @@ def main(config: MainConfig):
 
     
     expname = expname.format(**format_dict)
+    # Only add num_generations override for parallel generation type
+    if config.generation_type == "parallel":
+        current_overrides += " ++num_generations={NUM_GENERATIONS} "
     current_overrides = current_overrides.format(**format_dict)
     ctx = wrap_arguments(current_overrides)
 
