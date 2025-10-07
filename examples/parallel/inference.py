@@ -76,10 +76,12 @@ def main(config: MainConfig):
         server_gpus = 8
         server_args = "--tensor-parallel-size=8" # Aligned with evaluation.py
 
+    if config.cluster == "hsg":
+        server_gpus = 4
+   
     
     if config.local_model:
         model_path = f"/workspace/hf_models/{config.model_name}" # Access via config object  
-        server_gpus = 4
     else:       
         model_path = f"/hf_models/{config.model_name}" # Access via config object
     print(f"INFO: Using model path: {model_path}")
