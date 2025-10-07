@@ -136,7 +136,7 @@ def main(config: MainConfig):
                     server_nodes=server_nodes,
                     server_args=server_args,
                     num_random_seeds=config.num_runs,
-                    dependent_jobs=2,
+                    dependent_jobs=0,
                     time_min="04:00:00",
                     with_sandbox=True,
                 )
