@@ -83,10 +83,10 @@ def main(config: MainConfig):
         server_args = "--tensor-parallel-size=8" # Aligned with evaluation.py
 
     if config.cluster == "hsg":
-        #server_type = 'sglang'
+        server_type = 'sglang'
         server_nodes = 4
         server_gpus = 4
-        #server_args = f"--ep-size {server_nodes * server_gpus} --tensor-parallel-size=16 "
+        server_args = f"--ep-size {server_nodes * server_gpus} --tensor-parallel-size=16 "
     if config.local_model:
         model_path = f"/workspace/hf_models/{config.model_name}" # Access via config object  
     else:       
