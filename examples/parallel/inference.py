@@ -52,7 +52,13 @@ def main(config: MainConfig):
         server_nodes = 2
         server_gpus = 8
         server_args = "--load-format sharded_state --tensor-parallel-size=16" # Aligned with evaluation.py
-
+    elif config.model_name == "Qwen3-235B-A22B-Thinking-2507":
+        # SGLang server settings
+        prompt_template = "qwen-instruct"
+        server_type = 'vllm'
+        server_nodes = 2
+        server_gpus = 8
+        server_args = "--enable-expert-parallel --tensor-parallel-size=16" # Aligned with evaluation.py
     elif config.model_name == "gpt-oss-120b" or config.model_name == "gpt-oss-20b":
         # vLLM server settings
         prompt_template = "gpt-oss-high"
@@ -81,7 +87,6 @@ def main(config: MainConfig):
         server_nodes = 4
         server_gpus = 4
         server_args = f"--ep-size {server_nodes * server_gpus} --tensor-parallel-size=16 "
-    
     if config.local_model:
         model_path = f"/workspace/hf_models/{config.model_name}" # Access via config object  
     else:       
