@@ -21,7 +21,7 @@ executing all commands from that folder locally. Change all commands accordingly
 Get the model from HF.
 ```bash
 pip install -U "huggingface_hub[cli]"
-huggingface-cli download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir /workspace/Llama-3_3-Nemotron-Super-49B-v1_5
+hf download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir /workspace/Llama-3_3-Nemotron-Super-49B-v1_5
 ```
 
 !!!note
@@ -101,8 +101,37 @@ ns eval \
     --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5/ \
-    --benchmarks=gpqa:16,mmlu-pro:16,scicode:16,math-500:16,aime24:16,aime25:16 \
+    --benchmarks=scicode:16,math-500:16,aime24:16,aime25:16 \
     --server_gpus=2 \
+    ++inference.tokens_to_generate=65536 \
+    ++inference.temperature=0.6 \
+    ++inference.top_p=0.95 \
+    ++system_message=''
+```
+
+For GPQA and MMLU-Pro, we additionally specify the exact prompt on which we evaluate the benchmark:
+```bash hl_lines="7"
+ns eval \
+    --cluster=local \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --server_type=vllm \
+    --output_dir=/workspace/llama_nemotron_49b_1_5/ \
+    --benchmarks=mmlu-pro:16 \
+    --server_gpus=2 \
+    ++prompt_config=eval/aai/mcq-10choices-boxed \
+    ++inference.tokens_to_generate=65536 \
+    ++inference.temperature=0.6 \
+    ++inference.top_p=0.95 \
+    ++system_message=''
+
+ns eval \
+    --cluster=local \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --server_type=vllm \
+    --output_dir=/workspace/llama_nemotron_49b_1_5/ \
+    --benchmarks=gpqa:16 \
+    --server_gpus=2 \
+    ++prompt_config=eval/aai/mcq-4choices-boxed \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
@@ -164,7 +193,7 @@ Tool-calling benchmarks require tool-call parsing and execution. NeMo-Skills sup
 ns eval \
     --cluster=local \
     --benchmarks=bfcl_v3 \
-    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/ \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
     --server_gpus=2 \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5_tool_calling/ \
@@ -243,8 +272,8 @@ pass@16           | 166         | 18881      | 1552        | 87.35%
 
 --------------------------------------------------- scicode ----------------------------------------------------
 evaluation_mode   | avg_tokens | gen_seconds | problem_accuracy | subtask_accuracy | num_problems | num_subtasks
-pass@1[avg-of-16] | 42970      | 2414        | 3.46%            | 31.14%           | 65           | 288
-pass@16           | 42970      | 2414        | 9.23%            | 43.40%           | 65           | 288
+pass@1[avg-of-16] | 35418      | 4271        | 13.59%           | 37.83%           | 80           | 338
+pass@16           | 35418      | 4271        | 25.00%           | 52.07%           | 80           | 338
 ```
 
 #### Results for Math Reasoning benchmarks (Reasoning on)
@@ -335,8 +364,42 @@ ns eval \
     --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off/ \
-    --benchmarks=gpqa:16,mmlu-pro:16,scicode:16,math-500:16,aime24:16,aime25:16 \
+    --benchmarks=scicode:16,math-500:16,aime24:16,aime25:16 \
     --server_gpus=2 \
+    ++inference.tokens_to_generate=65536 \
+    ++inference.temperature=0.0 \
+    ++inference.top_p=1.0 \
+    ++system_message='/no_think'
+```
+
+For GPQA, the command is:
+
+```bash
+ns eval \
+    --cluster=local \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --server_type=vllm \
+    --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off/ \
+    --benchmarks=gpqa:16 \
+    --server_gpus=2 \
+    ++prompt_config=eval/aai/mcq-4choices-boxed \
+    ++inference.tokens_to_generate=65536 \
+    ++inference.temperature=0.0 \
+    ++inference.top_p=1.0 \
+    ++system_message='/no_think'
+```
+
+For MMLU-Pro, the command is:
+
+```bash
+ns eval \
+    --cluster=local \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --server_type=vllm \
+    --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off/ \
+    --benchmarks=mmlu-pro:16 \
+    --server_gpus=2 \
+    ++prompt_config=eval/aai/mcq-10choices-boxed \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.0 \
     ++inference.top_p=1.0 \
@@ -385,7 +448,7 @@ ns eval \
 ns eval \
     --cluster=local \
     --benchmarks=bfcl_v3 \
-    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/ \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
     --server_gpus=2 \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off_tool_calling/ \
@@ -458,8 +521,8 @@ pass@16           | 166         | 609        | 1156        | 33.73%
 
 --------------------------------------------------- scicode ----------------------------------------------------
 evaluation_mode   | avg_tokens | gen_seconds | problem_accuracy | subtask_accuracy | num_problems | num_subtasks
-pass@1[avg-of-16] | 3070       | 1036        | 0.10%            | 21.38%           | 65           | 288
-pass@16           | 3070       | 1036        | 1.54%            | 32.64%           | 65           | 288
+pass@1[avg-of-16] | 2762       | 673         | 7.66%            | 24.69%           | 80           | 338
+pass@16           | 2762       | 673         | 11.25%           | 36.39%           | 80           | 338
 ```
 
 #### Results for Math Reasoning benchmarks (Reasoning off)

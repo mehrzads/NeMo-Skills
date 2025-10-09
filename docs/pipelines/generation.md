@@ -126,7 +126,7 @@ ns generate \
        --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
        ++prompt_config=generic/math-base \
        ++examples_type=math_text_detailed \
-       ++use_completions_api=True \
+       ++inference.endpoint_type=text \
        ++tokenizer=meta-llama/Llama-3.1-405B \
        ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
@@ -307,24 +307,164 @@ To get a more robust assessment of whether the solutions are correct you can fol
 
 Here are some suggestions on how to make your generation jobs more efficient
 
-1. Whenever your job is not fully done, you can just resubmit it with exactly the same parameters and we will reuse
-   what was generated already (if you want to ignore existing data add `++skip_filled=False`). You can also schedule
-   multiple dependent jobs on slurm right away with `--dependent_jobs=X` parameter.
-2. Use `--num_chunks` parameter to parallelize each generation this many times
-   (we will split the data file and merge back when all jobs are finished). If some chunks run into error
-   or don't finish for other reasons, you can just resubmit the same job and we will only rerun missing chunks.
-3. Use `preprocess_cmd` and `postprocess_cmd` commands to add some pre/post-processing logic that might be needed
-   for some generations. Keep in mind that if you use `--num_random_seeds` those commands will be run for each
-   random seed separately. We will run `.format(random_seed=random_seed)` on your command which lets you run the same
-   logic on each output file, e.g.
+### Handling Long/Unfinished Jobs
 
-    ```python
-    cmd = f"python /nemo_run/code/my_script.py {output_dir}/output.jsonl"
-    generate(
-        # ...
-        postprocess_cmd=cmd
+Whenever your job is not fully done, you can just resubmit it with exactly the same parameters and we will reuse
+what was generated already (if you want to ignore existing data add `++skip_filled=False`). You can also schedule
+multiple dependent jobs on slurm right away with `--dependent_jobs=X` parameter.
+
+### Parallelizing Generation Across Multiple Jobs
+Use `--num_chunks` parameter to parallelize each generation this many times (we will split the data file and merge back when all jobs are finished).
+If some chunks run into error or don't finish for other reasons, you can just resubmit the same job and we will only rerun missing chunks.
+
+
+### Preprocessing and Postprocessing Commands
+
+Use `preprocess_cmd` and `postprocess_cmd` commands to add some pre/post-processing logic that might be needed
+for some generations. Keep in mind that if you use `--num_random_seeds` those commands will be run for each
+random seed separately. We will run `.format(random_seed=random_seed)` on your command which lets you run the same
+logic on each output file, e.g.
+
+```python
+cmd = f"python /nemo_run/code/my_script.py {output_dir}/output.jsonl"
+generate(
+    # ...
+    postprocess_cmd=cmd
+)
+```
+
+If you need to run some logic that aggregates information from across all random seeds, you can instead schedule
+a dependent [run_cmd command](./run-cmd.md).
+
+!!! warning
+    Currently preprocess_cmd doesn't work correctly with `num_chunks>1`
+
+### Soft Failure + Context-Limit Recovery
+
+Generation/Evaluation jobs can fail due to server-side errors, such as exceeding context limits. By default, jobs crash immediately at the point of failure, forcing users to diagnose the issue before restarting. This is particularly annoying for synthetic data generation where jobs are scheduled at scale—a single point of failure can become a bottleneck for the entire process.
+
+#### Basic Soft Failure Mode
+
+To allow jobs to continue despite failures, enable soft failure mode with `++server.enable_soft_fail=True`. Examples that encounter errors will produce output with empty generation and error information:
+```python
+{
+    "generation": "",
+    "error": "context_window_exceeded",
+    "detailed_error": "<full error message and traceback>"
+}
+```
+
+Users can inspect the errors at the end of the job without blocking non-problematic instances.
+
+#### Automatic Context-Limit Recovery
+
+For context window errors specifically, users can enable automatic recovery strategies that attempt to fit inputs within the model's limits.
+
+We support three methods for automatic trimming of generation budget or context:
+
+1. `reduce_generation`: Reduces the generation budget (if specified). For example, if a prompt is 40K tokens long, and the requested generation budget for the job is 2048, and the context window is 41K, we will dynamically reduce the generation budget for this instance so that the prompt and the output fit in the context window.
+
+2. `reduce_prompt_from_start`: Removes tokens from the start of the prompt to accommodate the requested `tokens_to_generate`. Note that for this strategy we require the generation budget, i.e., `++inference.tokens_to_generate` to be specified for the job.
+
+3. `reduce_prompt_from_end`: Same as `reduce_prompt_from_start` except that tokens are removed from the end of the input prompt.
+
+
+!!!note
+    These strategies are primarily tested with vllm and sglang servers and may not work reliably with other server types.
+
+
+=== "reduce_generation"
+
+    ```python hl_lines="13-14"
+
+    from nemo_skills.prompt.utils import get_prompt
+    from nemo_skills.inference.model import get_model
+    import asyncio
+
+    prompt = get_prompt(
+        "generic/math",
+        tokenizer="Qwen/Qwen3-0.6B",
     )
+
+    input_prompt = prompt.fill({"problem": "What's 2 + 2?"})
+    llm = get_model(
+        model="Qwen/Qwen3-0.6B",
+        server_type="vllm",
+        enable_soft_fail=True,
+        context_limit_retry_strategy="reduce_generation"
+    )
+
+    # The 1M generation budget is well beyond the 40960 context window size of Qwen/Qwen3-0.6B
+    # We will automatically reduce the generation budget to fit in the context window
+    output_dict = asyncio.run(llm.generate_async(input_prompt, tokens_to_generate=1_000_000))
+    ```
+    To specify this setting for the generation or eval pipeline use
+    ```bash
+        ++server.enable_soft_fail=True
+        ++server.context_limit_retry_strategy=reduce_generation
     ```
 
-    If you need to run some logic that aggregates information from across all random seeds, you can instead schedule
-    a dependent [run_cmd command](./run-cmd.md).
+=== "reduce_prompt_from_start"
+
+    ```python hl_lines="15-16"
+    from nemo_skills.prompt.utils import get_prompt
+    from nemo_skills.inference.model import get_model
+    import asyncio
+
+    prompt = get_prompt(
+        "generic/math",
+        tokenizer="Qwen/Qwen3-0.6B",
+    )
+
+    # Construct a fake long prompt
+    fake_long_prompt = "aa" * 500_000 + "bb" * 500_000
+    input_prompt = prompt.fill({"problem": "What's the next character after " + fake_long_prompt})
+    llm = get_model(
+        model="Qwen/Qwen3-0.6B",
+        server_type="vllm",
+        enable_soft_fail=True,
+        context_limit_retry_strategy="reduce_prompt_from_start",
+    )
+
+    # We will automatically reduce the prompt from the start to fit in the context window
+    # Note that this requires the `tokens_to_generate` budget to be specified
+    output_dict = asyncio.run(llm.generate_async(prompt=input_prompt, tokens_to_generate=1024))
+    ```
+    To specify this setting for the generation or eval pipeline use
+    ```bash
+        ++server.enable_soft_fail=True
+        ++server.context_limit_retry_strategy=reduce_prompt_from_start
+    ```
+
+=== "reduce_prompt_from_end"
+
+    ```python hl_lines="15-16"
+
+    from nemo_skills.prompt.utils import get_prompt
+    from nemo_skills.inference.model import get_model
+    import asyncio
+
+    prompt = get_prompt(
+        "generic/math",
+        tokenizer="Qwen/Qwen3-0.6B",
+    )
+
+    # Construct a fake long prompt
+    fake_long_prompt = "aa" * 500_000 + "bb" * 500_000
+    input_prompt = prompt.fill({"problem": "What's the next character after " + fake_long_prompt})
+    llm = get_model(
+        model="Qwen/Qwen3-0.6B",
+        server_type="vllm",
+        enable_soft_fail=True,
+        context_limit_retry_strategy="reduce_prompt_from_end"
+    )
+
+    # We will automatically reduce the prompt from the end to fit in the context window
+    # Note that this requires the `tokens_to_generate` budget to be specified
+    output_dict = asyncio.run(llm.generate_async(prompt=input_prompt, tokens_to_generate=1024))
+    ```
+    To specify this setting for the generation or eval pipeline use
+    ```bash
+        ++server.enable_soft_fail=True
+        ++server.context_limit_retry_strategy=reduce_prompt_from_end
+    ```

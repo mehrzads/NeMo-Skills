@@ -12,14 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import re
-from pathlib import Path
 
-from nemo_skills.evaluation.evaluator.arena import JUDGE_MODEL, JUDGE_SERVER
 from nemo_skills.evaluation.metrics.base import BaseMetrics
-from nemo_skills.inference.model import get_model
-from nemo_skills.utils import unroll_files
 
 
 class ArenaMetrics(BaseMetrics):
@@ -95,6 +90,7 @@ class ArenaMetrics(BaseMetrics):
         metrics.update(get_aggregate_score(self.scores))
         metrics_dict = {self.agg_mode: metrics}
         self.update_common_metrics(metrics_dict[self.agg_mode])
+        # arena metrics have their own confidence estimation, so not doing std metrics here
         return metrics_dict
 
     def reset(self):

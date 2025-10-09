@@ -26,7 +26,7 @@ def test_eval_gsm8k_api(tmp_path):
     cmd = (
         f"ns eval "
         f"    --server_type=openai "
-        f"    --model=meta/llama-3.1-8b-instruct "
+        f"    --model=nvidia/nvidia-nemotron-nano-9b-v2 "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
         f"    --benchmarks=gsm8k "
         f"    --output_dir={tmp_path} "
@@ -49,11 +49,43 @@ def test_eval_gsm8k_api(tmp_path):
     assert metrics["symbolic_correct"] >= 80
 
 
+def test_eval_judge_api(tmp_path):
+    cmd = (
+        f"ns eval "
+        f"    --server_type=openai "
+        f"    --model=nvidia/nvidia-nemotron-nano-9b-v2 "
+        f"    --server_address=https://integrate.api.nvidia.com/v1 "
+        f"    --benchmarks=math-500 "
+        f"    --output_dir={tmp_path} "
+        f"    --judge_model=nvidia/nvidia-nemotron-nano-9b-v2 "
+        f"    --judge_server_address=https://integrate.api.nvidia.com/v1 "
+        f"    --judge_server_type=openai "
+        f"    --judge_generation_type=math_judge "
+        f"    ++max_samples=2 "
+    )
+    subprocess.run(cmd, shell=True, check=True)
+
+    # checking that summarize results works (just that there are no errors, but can inspect the output as well)
+    subprocess.run(
+        f"ns summarize_results {tmp_path}",
+        shell=True,
+        check=True,
+    )
+
+    # running compute_metrics to check that results are expected
+    metrics = ComputeMetrics(benchmark="math-500").compute_metrics(
+        [f"{tmp_path}/eval-results/math-500/output.jsonl"],
+    )["_all_"]["pass@1"]
+
+    assert metrics["symbolic_correct"] >= 40
+    assert metrics["judge_correct"] >= 40
+
+
 def test_fail_on_api_key_env_var(tmp_path):
     cmd = (
         f"ns eval "
         f"    --server_type=openai "
-        f"    --model=meta/llama-3.1-8b-instruct "
+        f"    --model=nvidia/nvidia-nemotron-nano-9b-v2 "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
         f"    --benchmarks=gsm8k "
         f"    --output_dir={tmp_path} "
@@ -74,7 +106,7 @@ def test_succeed_on_api_key_env_var(tmp_path):
         f"unset NVIDIA_API_KEY && "
         f"ns eval "
         f"    --server_type=openai "
-        f"    --model=meta/llama-3.1-8b-instruct "
+        f"    --model=nvidia/nvidia-nemotron-nano-9b-v2 "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
         f"    --benchmarks=gsm8k "
         f"    --output_dir={tmp_path} "
@@ -103,7 +135,7 @@ def test_generate_openai_format(tmp_path, format):
     cmd = (
         f"ns generate "
         f"    --server_type=openai "
-        f"    --model=meta/llama-3.1-8b-instruct "
+        f"    --model=nvidia/nvidia-nemotron-nano-9b-v2 "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
         f"    --input_file=/nemo_run/code/tests/data/openai-input-{format}.test "
         f"    --output_dir={tmp_path} "

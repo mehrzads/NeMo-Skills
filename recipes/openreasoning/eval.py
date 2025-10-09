@@ -15,10 +15,10 @@
 from nemo_skills.pipeline.cli import eval, genselect, wrap_arguments
 
 size_to_eval_gpus = {
-    '1.5b': 1,
-    '7b': 2,
-    '14b': 4,
-    '32b': 8,
+    "1.5b": 1,
+    "7b": 2,
+    "14b": 4,
+    "32b": 8,
 }
 
 eval_tokens = 65536
@@ -31,7 +31,7 @@ run_genselect = True
 
 cluster = "slurm"
 
-model_sizes = ['1.5B', '7B', '14B', '32B']
+model_sizes = ["1.5B", "7B", "14B", "32B"]
 
 output_dir = "/workspace/open-reasoning-evals"
 
@@ -45,7 +45,7 @@ def eval_aai(model_size):
         model=f"/workspace/OpenReasoning-Nemotron-{model_size}",
         server_type="sglang",
         server_gpus=size_to_eval_gpus[model_size],
-        benchmarks=f"aai",
+        benchmarks="aai",
         judge_model="/workspace/Qwen2.5-32B-Instruct",
         judge_server_type="sglang",
         judge_server_gpus=8,
@@ -67,7 +67,7 @@ def eval_math(model_size):
         model=f"/workspace/OpenReasoning-Nemotron-{model_size}",
         server_type="sglang",
         server_gpus=size_to_eval_gpus[model_size],
-        benchmarks=','.join([f"{bench}:{math_seeds}" for bench in math_benchmarks]),
+        benchmarks=",".join([f"{bench}:{math_seeds}" for bench in math_benchmarks]),
         num_jobs=64,
     )
 
@@ -103,7 +103,9 @@ def eval_code(model_size):
 
 def eval_science(model_size):
     eval(
-        ctx=wrap_arguments(f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 "),
+        ctx=wrap_arguments(
+            f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 ++prompt_config=eval/aai/mcq-4choices-boxed "
+        ),
         cluster=cluster,
         expname=f"eval-gpqa-{model_size}",
         output_dir=f"{output_dir}/{model_size}",
@@ -113,7 +115,9 @@ def eval_science(model_size):
         benchmarks=f"gpqa:{science_seeds}",
     )
     eval(
-        ctx=wrap_arguments(f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 "),
+        ctx=wrap_arguments(
+            f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 ++prompt_config=eval/aai/mcq-10choices-boxed "
+        ),
         cluster=cluster,
         expname=f"eval-mmlu-pro-{model_size}",
         output_dir=f"{output_dir}/{model_size}",

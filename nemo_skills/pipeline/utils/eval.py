@@ -15,17 +15,73 @@
 import importlib
 import logging
 import os
+import re
+import shlex
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.dataset.utils import get_dataset_module, import_from_path
+from nemo_skills.evaluation.evaluator import supports_single_eval
 from nemo_skills.inference import GENERATION_MODULE_MAP
 from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.utils import compute_chunk_ids, get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
+
+
+def parse_eval_args(eval_args: str) -> tuple[str | None, dict]:
+    # TODO we ideally don't want to rely on custom parsing of the command, but
+    # some major refactoring or clever ideas might be needed
+    """Parse eval_args string to extract eval_type and eval_config.
+
+    Handles Hydra argument formats:
+    - ++eval_type=value (override)
+    - +eval_type=value (new)
+    - eval_type=value (config)
+    """
+    if not eval_args:
+        return None, {}
+
+    eval_type = None
+    eval_config = {}
+
+    # Parse eval_args to extract eval_type and eval_config
+    eval_arg_parts = shlex.split(eval_args)
+    for part in eval_arg_parts:
+        # Match eval_type with any Hydra prefix
+        eval_type_match = re.match(r"^(\+{0,2})eval_type=(.+)$", part)
+        if eval_type_match:
+            eval_type = eval_type_match.group(2)
+            continue
+
+        # Match eval_config with any Hydra prefix
+        eval_config_match = re.match(r"^(\+{0,2})eval_config\.(.+)$", part)
+        if eval_config_match:
+            config_part = eval_config_match.group(2)
+            if "=" in config_part:
+                key, value = config_part.split("=", 1)
+                # Handle nested keys like sandbox.timeout
+                if "." in key:
+                    main_key, sub_key = key.split(".", 1)
+                    if main_key not in eval_config:
+                        eval_config[main_key] = {}
+                    eval_config[main_key][sub_key] = value
+                else:
+                    eval_config[key] = value
+
+    return eval_type, eval_config
+
+
+def should_use_single_eval(eval_args: str) -> bool:
+    """Determine if evaluation should be done during generation (single) vs after (batch)."""
+    eval_type, eval_config = parse_eval_args(eval_args)
+
+    if not eval_type:
+        return False
+
+    return supports_single_eval(eval_type, eval_config)
 
 
 @dataclass
@@ -37,6 +93,7 @@ class BenchmarkArgs:
     judge_args: str
     judge_pipeline_args: dict
     requires_sandbox: bool
+    keep_mounts_for_sandbox: bool
     generation_module: str
     num_samples: int
     num_chunks: int | None
@@ -49,6 +106,17 @@ class BenchmarkArgs:
     @property
     def requires_judge(self):
         return bool(self.judge_args or self.judge_pipeline_args)
+
+
+def combine_cmds(cmds: list[str], single_node_mode: str) -> str:
+    """Combine multiple eval commands into a single eval cmd."""
+    if single_node_mode == "sequential":
+        return " && ".join(cmds)
+    elif single_node_mode == "parallel":
+        if len(cmds) == 1:
+            return cmds[0]
+        return " & ".join(f"( {cmd} )" for cmd in cmds) + " & wait "
+    raise ValueError(f"Unknown single_node_mode: {single_node_mode}")
 
 
 def get_arg_from_module_or_dict(module, arg_name, default_value=None, override_dict=None):
@@ -113,6 +181,9 @@ def get_benchmark_args_from_module(
     if prompt_config:
         generation_args = f"++prompt_config={prompt_config} {generation_args}"
     requires_sandbox = get_arg_from_module_or_dict(benchmark_module, "REQUIRES_SANDBOX", False, override_dict)
+    keep_mounts_for_sandbox = get_arg_from_module_or_dict(
+        benchmark_module, "KEEP_MOUNTS_FOR_SANDBOX", False, override_dict
+    )
 
     generation_module = get_arg_from_module_or_dict(
         benchmark_module, "GENERATION_MODULE", "nemo_skills.inference.generate", override_dict
@@ -154,6 +225,7 @@ def get_benchmark_args_from_module(
         judge_args=judge_args,
         judge_pipeline_args=judge_pipeline_args,
         requires_sandbox=requires_sandbox,
+        keep_mounts_for_sandbox=keep_mounts_for_sandbox,
         generation_module=generation_module,
         num_samples=num_samples,
         num_chunks=num_chunks,
@@ -237,6 +309,7 @@ def prepare_eval_commands(
     extra_datasets_type,
     exclusive,
     with_sandbox,
+    keep_mounts_for_sandbox,
     wandb_parameters,
     extra_eval_args,
     eval_requires_judge,
@@ -287,14 +360,19 @@ def prepare_eval_commands(
             benchmarks_dict[benchmark] = benchmark_args
             if rs_num != -1:
                 if len(cur_benchmarks) > 1:
-                    raise ValueError(
-                        f"Cannot specify number of samples ({rs_num}) for benchmark group {benchmark_or_group}. "
-                        f"Use '{benchmark_or_group}' instead of '{benchmark_or_group}:{rs_num}'."
+                    LOG.warning(
+                        "Number of samples > 1 (%d) is specified for a benchmark group %s, "
+                        "overriding for all benchmarks in the group.",
+                        rs_num,
+                        benchmark_or_group,
                     )
                 benchmarks_dict[benchmark].num_samples = rs_num
 
             if benchmark_args.requires_sandbox and not with_sandbox:
                 LOG.warning("Found benchmark (%s) which requires sandbox, enabled sandbox for it.", benchmark)
+
+            if benchmark_args.requires_sandbox and not keep_mounts_for_sandbox:
+                LOG.warning("Found benchmark (%s) which requires sandbox to keep mounts, enabling it.", benchmark)
 
     total_evals = 0
     for benchmark, benchmark_args in benchmarks_dict.items():
@@ -337,9 +415,7 @@ def prepare_eval_commands(
         eval_to_job_map.extend([i] * count)
 
     cur_job_idx = 0
-    get_random_port = pipeline_utils.should_get_random_port(
-        server_parameters["server_gpus"], exclusive, server_parameters["server_type"]
-    )
+    get_random_port = pipeline_utils.should_get_random_port(server_parameters["server_gpus"], exclusive)
     job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
         **server_parameters,
         extra_arguments=extra_arguments,
@@ -388,17 +464,46 @@ def prepare_eval_commands(
                         f"Class {generation_task} overrides get_server_command_fn, "
                         "which is not supported for evaluation when grouping jobs."
                     )
-                full_extra_arguments = (
-                    f"{generation_task.get_generation_default_args()} "
-                    f"{benchmark_args.generation_args} "
-                    f"{job_extra_arguments} "
-                )
+                # Determine evaluation strategy
+                combined_eval_args = f"{benchmark_args.eval_args} {extra_eval_args}".strip()
+
+                if should_use_single_eval(combined_eval_args):
+                    # Add evaluation to generation arguments (single eval)
+                    eval_type, eval_config = parse_eval_args(combined_eval_args)
+                    eval_extra_args = f" ++eval_type={eval_type} "
+
+                    # Add eval_config parameters
+                    for key, value in eval_config.items():
+                        if isinstance(value, dict):
+                            for nested_key, nested_value in value.items():
+                                eval_extra_args += f" ++eval_config.{key}.{nested_key}={nested_value} "
+                        else:
+                            eval_extra_args += f" ++eval_config.{key}={value} "
+
+                    full_extra_arguments = (
+                        f"{generation_task.get_generation_default_args()} "
+                        f"{benchmark_args.generation_args} "
+                        f"{job_extra_arguments} "
+                        f"{eval_extra_args} "
+                    )
+
+                    # No separate eval command
+                    eval_args_for_cmd = None
+                else:
+                    # Use batch evaluation (separate command)
+                    full_extra_arguments = (
+                        f"{generation_task.get_generation_default_args()} "
+                        f"{benchmark_args.generation_args} "
+                        f"{job_extra_arguments} "
+                    )
+                    eval_args_for_cmd = combined_eval_args
+
                 cmd = pipeline_utils.get_generation_cmd(
                     input_file=benchmark_args.input_file,
                     output_dir=benchmark_output_dir,
                     extra_arguments=full_extra_arguments,
                     random_seed=seed,
-                    eval_args=f"{benchmark_args.eval_args} {extra_eval_args}",
+                    eval_args=eval_args_for_cmd,
                     chunk_id=chunk_id,
                     num_chunks=benchmark_args.num_chunks,
                     script=generation_module or benchmark_args.generation_module,
@@ -409,12 +514,16 @@ def prepare_eval_commands(
 
                 if cur_eval == total_evals - 1 or cur_job_idx != eval_to_job_map[cur_eval + 1]:
                     job_needs_sandbox = any(benchmarks_dict[b].requires_sandbox for b in job_benchmarks)
+                    job_needs_sandbox_to_keep_mounts = any(
+                        benchmarks_dict[b].keep_mounts_for_sandbox for b in job_benchmarks
+                    )
                     # TODO: move to a dataclass
                     job_batches.append(
                         (
                             job_cmds,
                             job_benchmarks,
                             job_needs_sandbox,
+                            job_needs_sandbox_to_keep_mounts,
                             job_server_config,
                             job_server_address,
                             # a check above guarantees that this is the same for all tasks in a job

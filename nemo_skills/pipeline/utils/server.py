@@ -57,12 +57,12 @@ def get_free_port(exclude: list[int] | None = None, strategy: int | str = 5000) 
         raise ValueError(f"Strategy {strategy} not supported.")
 
 
-def should_get_random_port(server_gpus, exclusive, server_type):
-    return server_gpus != 8 and not exclusive and server_type != "megatron"
+def should_get_random_port(server_gpus, exclusive):
+    return server_gpus != 8 and not exclusive
 
 
 def wrap_python_path(cmd):
-    return f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && " + cmd
+    return "export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && " + cmd
 
 
 def set_python_path_and_wait_for_server(server_address, generation_commands):
@@ -121,8 +121,8 @@ def get_server_command(
 ):
     num_tasks = num_gpus
 
-    # check if the model path is mounted if not vllm;
-    # vllm can also pass model name as "model_path" so we need special processing
+    # check if the model path is mounted if not vllm, sglang, or trtllm;
+    # vllm, sglang, and trtllm can also pass model name as "model_path" so we need special processing
     if server_type not in ["vllm", "sglang", "trtllm"]:
         check_if_mounted(cluster_config, model_path)
 
@@ -149,6 +149,7 @@ def get_server_command(
             f"    --pipeline-model-parallel-size {num_nodes} "
             f"    --use-checkpoint-args "
             f"    --max-tokens-to-oom 12000000 "
+            f"    --port {server_port} "
             f"    --micro-batch-size 1 "  # that's a training argument, ignored here, but required to specify..
             f"    {server_args} "
         )
@@ -158,6 +159,7 @@ def get_server_command(
             f"python3 {server_entrypoint} "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
+            f"    --num_nodes {num_nodes} "
             f"    --port {server_port} "
             f"    {server_args} "
         )
@@ -168,7 +170,7 @@ def get_server_command(
         num_tasks = 1
     elif server_type == "sglang":
         if num_nodes > 1:
-            multinode_args = f" --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
+            multinode_args = " --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
         else:
             multinode_args = ""
         server_entrypoint = server_entrypoint or "-m nemo_skills.inference.server.serve_sglang"

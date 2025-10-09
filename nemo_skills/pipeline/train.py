@@ -26,13 +26,12 @@ from nemo_skills.pipeline.utils import (
     check_mounts,
     get_cluster_config,
     get_exp,
-    get_free_port,
     get_mounted_path,
-    get_timeout,
+    get_timeout_str,
     resolve_mount_paths,
     run_exp,
 )
-from nemo_skills.utils import get_logger_name, setup_logging
+from nemo_skills.utils import get_logger_name, setup_logging, validate_wandb_project_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -97,12 +96,15 @@ configs = {
     TrainingAlgo.rm: "rm_config",
 }
 
-rl_extra_args_fn = lambda params: (
-    f" ++model.data.data_prefix.train='[{params.training_data}]' "
-    f" ++model.data.data_prefix.validation='[{params.validation_data}]' "
-    f" ++model.data.data_prefix.test='[{params.validation_data}]' "
-    f" pretrained_checkpoint.restore_from_path={params.nemo_model} " + params.extra_arguments
-)
+
+def rl_extra_args_fn(params):
+    return (
+        f" ++model.data.data_prefix.train='[{params.training_data}]' "
+        f" ++model.data.data_prefix.validation='[{params.validation_data}]' "
+        f" ++model.data.data_prefix.test='[{params.validation_data}]' "
+        f" pretrained_checkpoint.restore_from_path={params.nemo_model} " + params.extra_arguments
+    )
+
 
 get_extra_arguments: dict[TrainingAlgo, Callable[[TrainingParams], str]] = {
     TrainingAlgo.sft: lambda params: (
@@ -138,7 +140,7 @@ def get_training_cmd(
     if validation_data is None:
         validation_data = training_data
 
-    timeout = get_timeout(cluster_config, partition)
+    timeout = get_timeout_str(cluster_config, partition)
 
     logging_params = get_logging_params(expname, disable_wandb, wandb_project, wandb_group)
 
@@ -184,6 +186,13 @@ def get_logging_params(expname, disable_wandb, wandb_project, wandb_group):
         )
         if wandb_group:
             logging_params += f"++exp_manager.wandb_logger_kwargs.group={wandb_group} "
+
+        validate_wandb_project_name(
+            wandb_project=wandb_project,
+            wandb_name=expname,
+            wandb_group=wandb_group,
+            wandb_id=wandb_id,
+        )
     else:
         logging_params = "exp_manager.create_wandb_logger=False +exp_manager.create_tensorboard_logger=True"
     return logging_params
@@ -238,6 +247,10 @@ def train(
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
     with_sandbox: bool = typer.Option(False, help="If sandbox is required for code generation"),
+    keep_mounts_for_sandbox: bool = typer.Option(
+        False,
+        help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
+    ),
     partition: str = typer.Option(None, help="Specify partition for jobs"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     average_steps: str = typer.Option(
@@ -368,6 +381,7 @@ def train(
                 partition=partition,
                 time_min=time_min,
                 with_sandbox=with_sandbox,
+                keep_mounts_for_sandbox=keep_mounts_for_sandbox,
                 run_after=run_after,
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,

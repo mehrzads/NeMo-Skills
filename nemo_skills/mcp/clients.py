@@ -13,10 +13,11 @@
 # limitations under the License.
 import copy
 import functools
-from abc import ABC, abstractmethod
+import json
+import os
+from abc import abstractmethod
 from typing import Any, Callable, Dict, List
 
-import aiohttp
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamablehttp_client
@@ -102,7 +103,25 @@ def _sanitize_input_args_for_tool(args_dict, tool_name, hide_args):
 
 def _wrap_call_tool_output_formatter(method):
     async def wrapped(self, *args, **kwargs):
-        result = await method(self, *args, **kwargs)
+        # Normalize to keyword-style and sanitize before delegating.
+        tool_name = kwargs.get("tool") if "tool" in kwargs else (args[0] if len(args) >= 1 else None)
+        provided_args = kwargs.get("args") if "args" in kwargs else (args[1] if len(args) >= 2 else None)
+        extra_args = kwargs.pop("extra_args", None)
+
+        if tool_name is None:
+            raise TypeError("call_tool requires 'tool' as first positional or keyword argument")
+        if not isinstance(provided_args, dict):
+            raise TypeError("call_tool requires 'args' dict as second positional or keyword argument")
+
+        sanitized_args = self.sanitize(tool_name, provided_args)
+        # Merge in extra_args AFTER sanitization so hidden/internal keys can be sent intentionally
+        if isinstance(extra_args, dict) and extra_args:
+            merged_args = {**sanitized_args, **extra_args}
+        else:
+            merged_args = sanitized_args
+
+        # Delegate with normalized kwargs only to avoid leaking unexpected kwargs
+        result = await method(self, tool=tool_name, args=merged_args)
         output_formatter = getattr(self, "output_formatter", None)
         if callable(output_formatter):
             return output_formatter(result)
@@ -152,7 +171,8 @@ class MCPClientMeta(type):
     - Wraps `list_tools` so its returned tool schemas are post-processed to
       remove arguments specified in `_hide_args` (by pruning properties and
       updating `required`).
-    - Input sanitization is available via `sanitize` method on the client.
+    - Input sanitization is performed automatically for call_tool() based on
+      `_hide_args`. A manual `sanitize` helper also exists if needed.
     - Ensures every instance has a default `_hide_args` attribute even when
       subclasses do not define/override `__init__`.
 
@@ -187,8 +207,9 @@ class MCPClientMeta(type):
     # The model could still hypothetically call the tool with the hidden argument,
     # but as long as the sanitize method is called, the hidden argument will be
     # removed from the input schema.
-    safe_args = client.sanitize("tool_name", {"timeout": 100000, "x": 1})
-    result = await client.call_tool("tool_name", timeout=10, **safe_args)
+    # Sanitization is automatic for call_tool(); hidden keys like "timeout"
+    # will be removed from the provided args before the actual tool call.
+    result = await client.call_tool("tool_name", {"timeout": 100000, "x": 1})
 
     ```
     """
@@ -249,34 +270,14 @@ class MCPClient(metaclass=MCPClientMeta):
         hide_args={"execute": ["session_id", "timeout"]},
     )
     tools = await client.list_tools()
-    safe = client.sanitize("execute", {"code": "print(1)", "timeout": 999})
-    result = await client.call_tool("execute", safe)
+    # Manual sanitize is not required; hidden keys are pruned automatically
+    # when calling tools.
+    result = await client.call_tool("execute", {"code": "print(1)", "timeout": 999})
     ```
 
-    Example (configured via OmegaConf, similar to mcp_demo.py):
-    ```python
-    from omegaconf import OmegaConf
-    from nemo_skills.mcp.config import build_client_manager
-
-    cfg = OmegaConf.create({
-        "tools": [
-            {
-                "id": "python",
-                "client": "nemo_skills.mcp.clients.MCPStdioClient",
-                "params": {
-                    "command": "python",
-                    "args": ["-m", "nemo_skills.mcp.servers.python_tool"],
-                    "hide_args": {"execute": ["session_id", "timeout"]},
-                },
-            },
-        ]
-    })
-    manager = build_client_manager(cfg)
-    tools = await manager.list_all_tools()
-    ```
     """
 
-    # Manual sanitization helpers (input-only)
+    # Manual sanitization helpers (input-only; optional, as call_tool auto-sanitizes)
     def sanitize(self, tool: str, args: dict) -> dict:
         """Return a copy of args with hidden keys removed for the given tool."""
         return _sanitize_input_args_for_tool(args, tool, self._hide_args)
@@ -307,36 +308,12 @@ class MCPStreamableHttpClient(MCPClient):
     Behavior:
     - list_tools() fetches tool metadata from the server and normalizes schema
       field names (supports both input_schema and inputSchema).
-    - call_tool() returns the server's structuredContent when present, otherwise
-      returns the raw result object.
+    - call_tool() automatically sanitizes arguments based on `hide_args` and
+      returns the server's structuredContent when present, otherwise returns the raw result object.
 
     The following optional configurables can be supplied (injected by the
     metaclass): hide_args, disabled_tools, enabled_tools, output_formatter,
     init_hook.
-
-    Example (OmegaConf config, like in mcp_demo.py):
-    ```python
-    from omegaconf import OmegaConf
-    from nemo_skills.mcp.config import build_client_manager
-
-    cfg = OmegaConf.create({
-        "tools": [
-            {
-                "id": "exa_mcp",
-                "client": "nemo_skills.mcp.clients.MCPStreamableHttpClient",
-                "params": {
-                    "base_url": "https://mcp.exa.ai/mcp",
-                    "enabled_tools": ["web_search_exa"],
-                    "output_formatter": "nemo_skills.mcp.utils.exa_output_formatter",
-                    "init_hook": "nemo_skills.mcp.utils.exa_auth_connector",
-                },
-            }
-        ]
-    })
-    manager = build_client_manager(cfg)
-    tools = await manager.list_all_tools()
-    result = await manager.execute_tool("exa_mcp.web_search_exa", {"query": "nemo skills"})
-    ```
 
     Example (manual usage):
     ```python
@@ -390,48 +367,12 @@ class MCPStdioClient(MCPClient):
 
     Behavior:
     - list_tools() fetches tool metadata from the running stdio server.
-    - call_tool() returns the server's structuredContent.
+    - call_tool() automatically sanitizes arguments based on `hide_args` and
+      returns the server's structuredContent.
 
     The following optional configurables can be supplied (injected by the
     metaclass): hide_args, disabled_tools, enabled_tools, output_formatter,
     init_hook.
-
-    Example (OmegaConf config, like in mcp_demo.py):
-    ```python
-    from omegaconf import OmegaConf
-    from nemo_skills.mcp.config import build_client_manager
-
-    cfg = OmegaConf.create({
-        "tools": [
-            {
-                "id": "python",
-                "client": "nemo_skills.mcp.clients.MCPStdioClient",
-                "params": {
-                    "command": "python",
-                    "args": ["-m", "nemo_skills.mcp.servers.python_tool"],
-                    "hide_args": {"execute": ["session_id", "timeout"]},
-                    "init_hook": {
-                        "$locate": "nemo_skills.mcp.utils.hydra_config_connector_factory",
-                        "kwargs": {"config_obj": "@@full_config"},
-                    },
-                },
-            },
-            {
-                "id": "exa",
-                "client": "nemo_skills.mcp.clients.MCPStdioClient",
-                "params": {
-                    "command": "python",
-                    "args": ["-m", "nemo_skills.mcp.servers.exa_tool"],
-                    "init_hook": "nemo_skills.mcp.utils.exa_stdio_connector",
-                },
-            },
-        ]
-    })
-    manager = build_client_manager(cfg)
-    tools = await manager.list_all_tools()
-    # Example tool call
-    result = await manager.execute_tool("python.execute", {"code": "print(1)"})
-    ```
 
     Example (manual usage):
     ```python
@@ -444,7 +385,8 @@ class MCPStdioClient(MCPClient):
     def __init__(self, command: str, args: list[str] | None = None):
         if args is None:
             args = []
-        self.server_params = StdioServerParameters(command=command, args=args)
+        # Default: inherit the caller's environment for all stdio-launched servers
+        self.server_params = StdioServerParameters(command=command, args=args, env=os.environ.copy())
         self.tools: List[Dict[str, Any]] = []
 
     async def list_tools(self):
@@ -473,102 +415,17 @@ class MCPStdioClient(MCPClient):
             async with ClientSession(read_stream, write_stream) as session:
                 await session.initialize()
                 result = await session.call_tool(tool, arguments=args)
-                return result.structuredContent
-
-
-class MCPClientManager:
-    """Registry and orchestrator for multiple MCP clients.
-
-    Responsibilities:
-    - register(name, client): Add a client under a unique name.
-    - list_all_tools(): Merge tool listings across clients; names are qualified
-      as "{client}.{tool}" to avoid collisions.
-    - execute_tool(tool_name, args): Route a qualified tool call to the owning
-      client (stripping the client prefix automatically).
-
-    Example (using config loader, like in mcp_demo.py):
-    ```python
-    from omegaconf import OmegaConf
-    from nemo_skills.mcp.config import build_client_manager
-
-    cfg = OmegaConf.create({
-        "tools": [
-            {"id": "python", "client": "nemo_skills.mcp.clients.MCPStdioClient", "params": {"command": "python", "args": ["-m", "nemo_skills.mcp.servers.python_tool"]}},
-            {"id": "exa_mcp", "client": "nemo_skills.mcp.clients.MCPStreamableHttpClient", "params": {"base_url": "https://mcp.exa.ai/mcp"}},
-        ]
-    })
-    manager = build_client_manager(cfg)
-    tools = await manager.list_all_tools()
-    out = await manager.execute_tool("python.execute", {"code": "print('ok')"})
-    ```
-
-    Example (manual registration):
-    ```python
-    manager = MCPClientManager()
-    manager.register("python", MCPStdioClient(command="python", args=["-m", "nemo_skills.mcp.servers.python_tool"]))
-    tools = await manager.list_all_tools()
-    out = await manager.execute_tool("python.execute", {"code": "print('ok')"})
-    ```
-    """
-
-    def __init__(self):
-        self.clients = {}
-        self.tool_map: dict[str, str] = {}  # maps "client.tool" -> client_name
-        self._tools_cache: list[dict[str, Any]] | None = None
-
-    def register(self, name: str, client: MCPClient):
-        # Enforce uniqueness of client (top-level) ids
-        if name in self.clients:
-            raise ValueError(f"Client name already registered: {name}")
-        self.clients[name] = client
-        for tool in client.tools:
-            raw_tool_name = tool.get("name")
-            if raw_tool_name is None:
-                continue
-            full_tool_name = f"{name}.{raw_tool_name}"
-            self.tool_map[full_tool_name] = name
-
-    def get_client(self, name: str):
-        return self.clients.get(name)
-
-    async def list_all_tools(self, use_cache: bool = True) -> list[dict[str, Any]]:
-        """
-        Return merged tool list from all clients.
-        Most recently registered clients override earlier ones for tool name collisions.
-        """
-        if use_cache and self._tools_cache is not None:
-            return self._tools_cache
-
-        all_tools: dict[str, dict[str, Any]] = {}
-        for client_name, client in self.clients.items():
-            tools = await client.list_tools()
-            for t in tools:
-                raw_name = t["name"]
-                full_name = f"{client_name}.{raw_name}"
-                # Use full name in the merged listing
-                if full_name in all_tools:
-                    raise ValueError(f"Duplicate fully-qualified tool id detected: '{full_name}'")
-                merged_tool = {"server": client_name, **t, "name": full_name}
-                all_tools[full_name] = merged_tool
-
-        self._tools_cache = list(all_tools.values())
-
-        # Update tool_map for fast resolution
-        self.tool_map = {t["name"]: t["server"] for t in self._tools_cache}
-
-        return self._tools_cache
-
-    def get_client_for_tool(self, tool_name: str) -> MCPClient:
-        if "." not in tool_name:
-            raise ValueError(f"Tool name must be in 'client.tool' format. Received: '{tool_name}'")
-        client_name, _ = tool_name.split(".", 1)
-        client = self.clients.get(client_name)
-        if client is None:
-            raise ValueError(f"No client registered with name {client_name}")
-        return client
-
-    async def execute_tool(self, tool_name: str, args: dict):
-        client = self.get_client_for_tool(tool_name)
-        # Strip client prefix before delegating to the underlying client
-        bare_tool_name = tool_name.split(".", 1)[1] if "." in tool_name else tool_name
-        return await client.call_tool(bare_tool_name, args)
+                struct = getattr(result, "structuredContent", None)
+                if struct is not None:
+                    return struct
+                # Fallback: try to parse first content item as JSON, else return text
+                content = getattr(result, "content", None)
+                if content:
+                    first = content[0]
+                    text = getattr(first, "text", None)
+                    if isinstance(text, str):
+                        try:
+                            return json.loads(text)
+                        except Exception:
+                            return text
+                return result

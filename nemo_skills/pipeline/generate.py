@@ -27,6 +27,7 @@ from nemo_skills.utils import (
     get_logger_name,
     setup_logging,
     str_ids_to_list,
+    validate_wandb_project_name,
 )
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -75,6 +76,9 @@ def generate(
         help="Path to the entrypoint of the server. "
         "If not specified, will use the default entrypoint for the server type.",
     ),
+    server_container: str = typer.Option(
+        None, help="Override container image for the hosted server (if server_gpus is set)"
+    ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     num_random_seeds: int = typer.Option(
@@ -100,6 +104,7 @@ def generate(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     eval_args: str = typer.Option(
         None, help="Specify if need to run nemo_skills/evaluation/evaluate_results.py on the generation outputs"
@@ -126,6 +131,10 @@ def generate(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
+    keep_mounts_for_sandbox: bool = typer.Option(
+        False,
+        help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
+    ),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     log_samples: bool = typer.Option(
         False,
@@ -179,10 +188,15 @@ def generate(
             "project": wandb_project,
             "group": wandb_group,
         }
+        validate_wandb_project_name(
+            wandb_project=wandb_project,
+            wandb_name=wandb_name or expname,
+            wandb_group=wandb_group,
+        )
     else:
         wandb_parameters = None
 
-    get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
+    get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive)
 
     if random_seeds and num_random_seeds:
         raise ValueError("Cannot specify both random_seeds and num_random_seeds")
@@ -266,6 +280,7 @@ def generate(
                     server_nodes=server_nodes,
                     server_args=server_args,
                     server_entrypoint=server_entrypoint,
+                    server_container=server_container,
                     extra_arguments=extra_arguments_original,
                     get_random_port=get_random_port,
                 )
@@ -296,9 +311,11 @@ def generate(
                         container=cluster_config["containers"]["nemo-skills"],
                         cluster_config=cluster_config,
                         partition=partition,
+                        qos=qos,
                         time_min=time_min,
                         server_config=server_config,
                         with_sandbox=with_sandbox,
+                        keep_mounts_for_sandbox=keep_mounts_for_sandbox,
                         sandbox_port=None if get_random_port else 6000,
                         run_after=run_after,
                         reuse_code=reuse_code,

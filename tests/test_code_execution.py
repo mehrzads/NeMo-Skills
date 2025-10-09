@@ -14,6 +14,7 @@
 
 import os
 import re
+from copy import deepcopy
 
 import pytest
 
@@ -109,7 +110,7 @@ async def test_timeout_error(language):
     code = """import time\ntime.sleep(1)\nprint("done")"""
 
     output, session_id = await sandbox.execute_code(code, timeout=1, language=language)
-    assert output == {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+    assert output == {"process_status": "timeout", "stdout": "", "stderr": "Execution timed out after 1 seconds\n"}
 
     output, session_id = await sandbox.execute_code(code, timeout=2, session_id=session_id, language=language)
     assert output == {"process_status": "completed", "stderr": "", "stdout": "done\n"}
@@ -296,7 +297,7 @@ async def test_lean4_basic_code_execution():
     output, session_id = await sandbox.execute_code(correct_code, language="lean4")
 
     # Assertions for the correct code
-    assert session_id == None
+    assert session_id is None
     assert output["process_status"] == "completed", "Expected the process to complete successfully"
     assert expected_output == output["stdout"], f"Expected the output to include '{expected_output}'"
     assert output["stderr"] == "", "Expected no error output"
@@ -314,10 +315,10 @@ async def test_lean4_mathlib_code_execution():
     """
     expected_output = "7\n"
 
-    output, session_id = await sandbox.execute_code(correct_code_mathlib, language="lean4")
+    output, session_id = await sandbox.execute_code(correct_code_mathlib, language="lean4", timeout=60)
 
     # Assertions for the mathlib code
-    assert session_id == None
+    assert session_id is None
     assert output["process_status"] == "completed", "Expected the process to complete successfully"
     assert expected_output == output["stdout"], f"Expected the output to include '{expected_output}'"
     assert output["stderr"] == "", "Expected no error output"
@@ -334,7 +335,7 @@ async def test_shell_code_execution():
     output, session_id = await sandbox.execute_code(correct_code_shell, language="shell")
 
     # Assertions for the shell code
-    assert session_id == None
+    assert session_id is None
     assert output["process_status"] == "completed", f"Expected the process to complete successfully, got {output}"
     assert expected_output in output["stdout"], f"Expected the output to include '{expected_output}', got {output}"
     assert output["stderr"] == "", f"Expected no error output, got {output}"
@@ -346,7 +347,7 @@ async def test_shell_code_execution():
     output, session_id = await sandbox.execute_code(incorrect_code_shell, language="shell")
 
     # Assertions for the shell code
-    assert session_id == None
+    assert session_id is None
     assert output["process_status"] == "error", f"Expected the process to complete with error, got {output}"
     assert output["stdout"] == "", f"Expected the output to be empty, got {output}"
     assert expected_error in output["stderr"], f"Expected error, got {output}"
@@ -368,12 +369,47 @@ async def test_lean4_code_execution_failure():
     error_output, session_id = await sandbox.execute_code(incorrect_code, language="lean4")
 
     # Assertions for the error case
-    assert session_id == None
+    assert session_id is None
     print(error_output)
     assert error_output["process_status"] == "failed", "Expected the process to fail due to syntax error"
     assert "unexpected token '#eval" in error_output["stdout"].lower(), (
         "Expected the error output to mention an unexpected token '#eval"
     )
+
+
+@pytest.mark.asyncio
+async def test_state_restoration():
+    sandbox = _get_sandbox()
+
+    # Build history with visible outputs
+    out1, sid = await sandbox.execute_code('print("H1"); a = 41', language="ipython")
+    assert out1["process_status"] == "completed"
+
+    out2, sid = await sandbox.execute_code('print("H2"); a += 1', session_id=sid, language="ipython")
+    assert out2["process_status"] == "completed"
+
+    # Run a cell that errors after mutating state; it should not be replayed during restoration
+    err_out, sid = await sandbox.execute_code(
+        'print("ERR"); a = 0; raise ValueError()', session_id=sid, language="ipython"
+    )
+    assert err_out["process_status"] == "error"
+    assert "ValueError" in err_out["stdout"]
+
+    # Force a new backend shell for the same session to trigger client-side restoration by deleting the session
+    assert str(sid) in sandbox.session_histories
+    # Make a copy of the history
+    history = deepcopy(sandbox.session_histories[str(sid)])
+    await sandbox.delete_session(str(sid))
+    # Restore the history
+    sandbox.session_histories[str(sid)] = history
+
+    # Execute code that relies on restored state; stdout should be ONLY from this new execution
+    out3, sid = await sandbox.execute_code("print(a)", session_id=sid, language="ipython")
+    assert out3["process_status"] == "completed"
+    assert out3["stdout"] == "42\n"
+    assert "H1" not in out3["stdout"]
+    assert "H2" not in out3["stdout"]
+    assert "ERR" not in out3["stdout"]
 
 
 @pytest.mark.asyncio

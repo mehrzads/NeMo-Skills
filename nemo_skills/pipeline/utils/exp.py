@@ -29,6 +29,7 @@ from torchx.specs.api import AppState
 
 from nemo_skills.pipeline.utils.cluster import (
     get_env_variables,
+    get_slurm_timeout_str,
     get_tunnel,
     temporary_env_update,
     tunnel_hash,
@@ -161,6 +162,7 @@ def get_executor(
     log_prefix: str = "main",
     mounts=None,
     partition=None,
+    qos=None,
     time_min=None,
     dependencies=None,
     extra_package_dirs: tuple[str] | None = None,
@@ -227,10 +229,7 @@ def get_executor(
                 slurm_kwargs = {}
             slurm_kwargs["exclusive"] = True
 
-    if "timeouts" not in cluster_config:
-        timeout = "10000:00:00:00"
-    else:
-        timeout = cluster_config["timeouts"][partition]
+    timeout = get_slurm_timeout_str(cluster_config, partition, with_save_delay=False)
 
     additional_parameters = {"time_min": time_min} if time_min is not None else {}
     if cluster_config.get("nv-meta", None) is not None:
@@ -277,6 +276,7 @@ def get_executor(
     return run.SlurmExecutor(
         account=cluster_config["account"],
         partition=partition,
+        qos=qos,
         nodes=num_nodes,
         ntasks_per_node=tasks_per_node,
         tunnel=get_tunnel(cluster_config),
@@ -362,8 +362,10 @@ def add_task(
     num_nodes=1,
     log_dir=None,
     partition=None,
+    qos=None,
     time_min=None,
     with_sandbox=False,
+    keep_mounts_for_sandbox=False,
     sandbox_port: int | None = None,
     server_config=None,
     reuse_code_exp: str | run.Experiment | None = None,
@@ -451,10 +453,11 @@ def add_task(
     commands = []
     executors = []
     # assuming server always has the largest resources request, so it needs to go first
-    if server_config is not None and server_config["num_gpus"] > 0:
+    if server_config is not None and int(server_config["num_gpus"]) > 0:
+        # do not pass container into the command builder
+        server_container = server_config.pop("container", cluster_config["containers"][server_config["server_type"]])
         server_cmd, num_server_tasks = get_server_command(**server_config, cluster_config=cluster_config)
-        if "container" not in server_config:
-            server_container = cluster_config["containers"][server_config["server_type"]]
+
         server_executor = get_executor(
             cluster_config=cluster_config,
             container=server_container,
@@ -462,6 +465,7 @@ def add_task(
             tasks_per_node=num_server_tasks,
             gpus_per_node=server_config["num_gpus"],
             partition=partition,
+            qos=qos,
             time_min=time_min,
             dependencies=dependencies,
             job_name=task_name,
@@ -506,6 +510,7 @@ def add_task(
                         tasks_per_node=cur_tasks,
                         gpus_per_node=num_gpus if server_config is None else 0,
                         partition=partition,
+                        qos=qos,
                         time_min=time_min,
                         dependencies=dependencies,
                         job_name=task_name,
@@ -547,7 +552,7 @@ def add_task(
                 gpus_per_node=0,
                 partition=partition,
                 time_min=time_min,
-                mounts=[],  # we don't want to mount anything
+                mounts=None if keep_mounts_for_sandbox else [],
                 dependencies=dependencies,
                 job_name=task_name,
                 log_dir=log_dir,

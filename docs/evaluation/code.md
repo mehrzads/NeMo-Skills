@@ -112,7 +112,12 @@ SWE-bench requires models to call custom tools. By default SWE-agent & OpenHands
 
 For more details and the list of supported parsers, see the docs: [VLLM](https://docs.vllm.ai/en/stable/features/tool_calling.html#automatic-function-calling), [SGLang](https://docs.sglang.ai/advanced_features/function_calling.html).
 
-In addition, both SWE-agent and OpenHands can run without native tool calling. This means the tool calls will be parsed by the agentic framework itself. To try this out, for SWE-agent you can use the [config for SWE-agent-LM-32B](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/eval/swe-bench/swe-agent/swe-agent-lm-32b.yaml) and for OpenHands you can set `native_tool_calling = false` in the config. Keep in mind that by default the tool call format expected by these frameworks will likely be different from the one that the model was trained on.
+In addition, both SWE-agent and OpenHands can run without native tool calling. This means the tool calls will be parsed by the agentic framework itself. To try this out, you can use the following configs with the `++agent_config` parameter:
+
+- for SWE-agent: [eval/swe-bench/swe-agent/swe-agent-lm-32b](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/eval/swe-bench/swe-agent/swe-agent-lm-32b.yaml). This was the config used for [SWE-agent-LM-32B](https://huggingface.co/SWE-bench/SWE-agent-LM-32B). Note that there are significant differences with the default config.
+- for OpenHands: [eval/swe-bench/openhands/no-native-tool-calling](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/eval/swe-bench/openhands/no-native-tool-calling.toml). This simply sets `native_tool_calling` to `false`.
+
+Keep in mind that by default the tool call format expected by these frameworks will likely be different from the one that the model was trained on.
 
 #### Sample run
 
@@ -138,8 +143,30 @@ ns eval \
 ```
 replacing <...> with your desired parameters.
 
+After all jobs are complete, you can check the results in `<OUTPUT_DIR>/eval-results/swe-bench/metrics.json`. They should look something like this:
+```
+{
+  "swe-bench": {
+    "pass@1": {
+      "num_entries": 500,
+      "gen_seconds": 7172,
+      "issues_resolved": 50.0,
+      "no_patch": 0.2,
+      "patch_cant_apply": 2.0
+    }
+  }
+}
+```
+Keep in mind there is some variance between runs, so we recommend running evaluation multiple times and averaging out the resolve rate. To do that automatically, you can set `--benchmarks=swe-bench:N`, where N is your desired number of repeats.
+
 To evaluate the same model with SWE-agent,
 all you need to do is replace `openhands` with `swe_agent` in the command above.
+
+!!! note
+    There are some instances where the gold (ground truth) patches do not pass the evaluation tests. Therefore, it's likely that on those instances even patches that resolve the issue will be incorrectly evaluated as "unresolved". We have observed 11 such instances in SWE-bench Verified: `astropy__astropy-7606`, `astropy__astropy-8707`, `astropy__astropy-8872`, `django__django-10097`, `psf__requests-1724`, `psf__requests-1766`, `psf__requests-1921`, `psf__requests-2317`, `pylint-dev__pylint-6528`, `pylint-dev__pylint-7080`, `pylint-dev__pylint-7277`. Depending on your setup, this set of instances may be different.
+
+!!! note
+    For evaluation, we use a [custom fork](https://github.com/Kipok/SWE-bench) of the SWE-bench repository that supports running evaluation inside of an existing container. It may not always have the latest updates from the upstream repo.
 
 ### ioi24
 
@@ -150,6 +177,88 @@ all you need to do is replace `openhands` with `swe_agent` in the command above.
 
 - Benchmark is defined in [`nemo_skills/dataset/livecodebench/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/livecodebench/__init__.py)
 - Original benchmark source is [here](https://github.com/LiveCodeBench/LiveCodeBench).
+
+#### Data Preparation
+
+First, prepare the dataset by running the `ns prepare_data` command. The arguments below will generate `test_v6_2408_2505.jsonl`.
+
+```
+ns prepare_data livecodebench --release_version v6 --start_date 2024-08 --end_date 2025-05
+```
+
+##### For Pypy3 Evaluation:
+If you plan to evaluate using the Pypy3 interpreter, you must add the `--keep_all_columns` flag during data preparation. This will download a larger dataset (~1.9GB) containing the necessary test cases. So, we recommend downloading the dataset into a Slurm cluster location.
+
+```
+ns prepare_data livecodebench --release_version v6 --start_date 2024-08 --end_date 2025-05 --keep_all_columns --cluster=<CLUSTER_NAME> --data_dir=<DATA_DIR>
+```
+
+#### Running the Evaluation
+
+Once the data is prepared, you can run the evaluation. Replace `<...>` placeholders with your cluster and directory paths.
+
+##### Standard Python Evaluation
+
+This command runs an evaluation of [OpenReasoning-Nemotron-32B](https://huggingface.co/nvidia/OpenReasoning-Nemotron-32B) on a Slurm cluster.
+
+```
+ns eval \
+    --cluster=<CLUSTER_NAME> \
+    --model=nvidia/OpenReasoning-Nemotron-32B \
+    --server_type=vllm \
+    --server_args="--async-scheduling" \
+    --server_nodes=1 \
+    --server_gpus=8 \
+    --benchmarks=livecodebench \
+    --split=test_v6_2408_2505 \
+    --data_dir=<DATA_DIR> \
+    --output_dir=<OUTPUT_DIR> \
+    --extra_eval_args="++eval_config.interpreter=python" \
+    --with_sandbox \
+    ++inference.temperature=0.6 \
+    ++inference.top_p=0.95 \
+    ++inference.tokens_to_generate=65536
+```
+
+##### Pypy3 Evaluation
+
+To run with the Pypy3 interpreter, modify the `--extra_eval_args` flag as shown below.
+```
+--extra_eval_args="++eval_config.interpreter=pypy3 ++eval_config.test_file=<DATA_DIR>/livecodebench/test_v6_2408_2505.jsonl"
+```
+
+##### Verifying Results
+
+After all jobs are complete, you can check the results in `<OUTPUT_DIR>/eval-results/livecodebench/metrics.json`. You can also take a look at `<OUTPUT_DIR>/eval-results/livecodebench/summarized-results/main_*` They should look something like this:
+
+```
+-------------------------- livecodebench --------------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 454         | 15995      | 2188        | 71.15%
+
+
+------------------------ livecodebench-easy -----------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 110         | 5338       | 1806        | 99.09%
+
+
+------------------------ livecodebench-hard -----------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 203         | 23031      | 2188        | 46.31%
+
+
+----------------------- livecodebench-medium ----------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 141         | 14178      | 1889        | 85.11%
+```
+
+##### Advanced: Averaging Multiple Runs
+
+Due to variance between runs, you can automatically repeat the evaluation and average the results. To run the evaluation 3 times, for example, set the `--benchmarks` flag as follows:
+
+```
+--benchmarks=livecodebench:3
+```
 
 ### livecodebench-pro
 
@@ -165,3 +274,80 @@ all you need to do is replace `openhands` with `swe_agent` in the command above.
 
 - Benchmark is defined in [`nemo_skills/dataset/mbpp/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/mbpp/__init__.py)
 - Original benchmark source is [here](https://github.com/google-research/google-research/tree/master/mbpp).
+
+### bigcodebench
+
+- Benchmark is defined in [`nemo_skills/dataset/bigcodebench/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/bigcodebench/__init__.py)
+- Original benchmark source is [here](https://github.com/bigcode-project/bigcodebench).
+
+### livebench-coding
+
+- Benchmark is defined in [`nemo_skills/dataset/livebench-coding/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/livebench-coding/__init__.py)
+- Original benchmark source is [here](https://huggingface.co/datasets/livebench/coding).
+
+### OJBench
+
+- Benchmark is defined in [`nemo_skills/dataset/ojbench/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/ojbench/__init__.py)
+- Original benchmark source is [here](https://github.com/He-Ren/OJBench/tree/main).
+
+#### Data preparation
+
+Before running ns eval, you will need to prepare the data with this command:
+
+```
+ns prepare_data --data_dir=<DATA_DIR> --cluster=<CLUSTER_NAME> ojbench
+```
+
+We encourage to download OJBench data into a Slurm cluster location because 15GB data will be downloaded by cloning [huggingface.co/datasets/He-Ren/OJBench_testdata](https://huggingface.co/datasets/He-Ren/OJBench_testdata). Two files will be created at `<DATA_DIR>` named `test_python.jsonl` and `test_cpp.jsonl`. Note that, data downloading require `HF_TOKEN` to be in the environment variables.
+
+#### Sample run
+
+Here's how to run a sample evaluation of [Qwen3-32B](https://huggingface.co/Qwen/Qwen3-32B) on a Slurm cluster.
+
+1. Prepare the data following instructions in the previous section.
+2. Run
+```
+ns eval \
+    --cluster=<CLUSTER_NAME> \
+    --model=Qwen/Qwen3-32B \
+    --server_type=vllm \
+    --server_nodes=1 \
+    --server_gpus=8 \
+    --benchmarks=ojbench \
+    --split=test_python \
+    --data_dir=<DATA_DIR> \
+    --output_dir=<OUTPUT_DIR> \
+    ++inference.temperature=0.6 \
+    ++inference.top_p=0.95 \
+    ++inference.tokens_to_generate=32768
+```
+replacing <...> with your desired parameters.
+
+After all jobs are complete, you can check the results in `<OUTPUT_DIR>/eval-results/ojbench/metrics.json`. You can also take a look at `<OUTPUT_DIR>/eval-results/ojbench/summarized-results/main_*` They should look something like this:
+```
+----------------------------- ojbench -----------------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 232         | 19628      | 2201        | 27.16%
+
+
+--------------------------- ojbench-easy --------------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 36          | 12052      | 1729        | 72.22%
+
+
+--------------------------- ojbench-hard --------------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 117         | 22585      | 2191        | 5.13%
+
+
+-------------------------- ojbench-medium -------------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 79          | 18701      | 2201        | 39.24%
+```
+
+Keep in mind there is some variance between runs, so we recommend running evaluation multiple times and averaging out the resolve rate. To do that automatically, you can set `--benchmarks=ojbench:N`, where N is your desired number of repeats.
+
+### human-eval-infilling
+
+- Benchmark is defined in [`nemo_skills/dataset/human-eval-infilling/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/human-eval-infilling/__init__.py)
+- Original benchmark source is [here](https://github.com/openai/human-eval-infilling).

@@ -52,6 +52,7 @@ def run_cmd(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     num_gpus: int | None = typer.Option(None, help="Number of GPUs to use"),
     num_nodes: int = typer.Option(1, help="Number of nodes to use"),
@@ -65,6 +66,9 @@ def run_cmd(
         None,
         help="Path to the entrypoint of the server. "
         "If not specified, will use the default entrypoint for the server type.",
+    ),
+    server_container: str = typer.Option(
+        None, help="Override container image for the hosted server (if server_gpus is set)"
     ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
@@ -85,6 +89,10 @@ def run_cmd(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
+    keep_mounts_for_sandbox: bool = typer.Option(
+        False,
+        help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
+    ),
     log_dir: str = typer.Option(
         None,
         help="Can specify a custom location for slurm logs. "
@@ -157,6 +165,7 @@ def run_cmd(
                 server_nodes=server_nodes,
                 server_args=server_args,
                 server_entrypoint=server_entrypoint,
+                server_container=server_container,
                 extra_arguments=extra_arguments,  # this is empty string by design
                 get_random_port=get_random_port,
             )
@@ -177,9 +186,11 @@ def run_cmd(
                 container=containers,
                 cluster_config=cluster_config,
                 partition=partition,
+                qos=qos,
                 time_min=time_min,
                 server_config=server_config,
                 with_sandbox=with_sandbox,
+                keep_mounts_for_sandbox=keep_mounts_for_sandbox,
                 sandbox_port=None if get_random_port else 6000,
                 run_after=run_after,
                 reuse_code=reuse_code,
