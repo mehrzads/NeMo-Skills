@@ -103,7 +103,7 @@ def main( code_input_files: List[str],  cluster: str, eval_type: str):
             num_gpus=server_gpus,
             with_sandbox=True,
             get_random_port=True,
-            exclusive=True,
+            #exclusive=True,
             time_min=merge_time_min,
         )
     
