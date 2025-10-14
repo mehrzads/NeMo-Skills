@@ -29,11 +29,10 @@ def main(config: MainConfig):
         " ++inference.tokens_to_generate={TOKENS_TO_GENERATE} "     
         " ++prompt_config={PROMPT_CONFIG} "
         " ++skip_filled=True " 
-        " ++inference.top_p={TOP_P} "       
+        " ++inference.top_p={TOP_P} " 
+        " ++max_concurrent_requests=1024 "      
     )
-    extra_overrides = (
-        
-        " ++max_concurrent_requests=1024 "
+    extra_overrides = (        
         "++inference.extra_body.reasoning_effort=high "
     )
 
@@ -119,11 +118,14 @@ def main(config: MainConfig):
     # Ensure num_chunks is defined (default is 1)
     num_chunks = config.num_chunks if hasattr(config, 'num_chunks') else 1
 
+    
 
     for cur_input_file in config.input_files:
         cur_stem = Path(cur_input_file).stem
         cur_output_dir = f"{config.output_dir.rstrip('/')}/{cur_stem}"
         cur_expname = f"{cur_stem}-{expname}"
+
+      
 
         if config.model_name == "gpt-oss-120b" or config.model_name == "gpt-oss-20b":
             if num_chunks >1 :
