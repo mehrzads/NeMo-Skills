@@ -59,6 +59,7 @@ EVALUATOR_MAP = {
     "scicode": eval_scicode,
     "mrcr": eval_mrcr,
     "ioi": eval_ioi,
+    "icpc": eval_icpc,
     "bigcodebench": eval_bigcodebench,
     "ojbench": eval_ojbench,
     "human_eval_infilling": eval_human_eval_infilling,
