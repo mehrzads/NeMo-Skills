@@ -27,6 +27,7 @@ from nemo_skills.evaluation.evaluator.code import (
 from nemo_skills.evaluation.evaluator.ifbench import eval_ifbench
 from nemo_skills.evaluation.evaluator.ifeval import eval_if
 from nemo_skills.evaluation.evaluator.ioi import IOIEvaluator
+from nemo_skills.evaluation.evaluator.icpc import ICPCEvaluator
 from nemo_skills.evaluation.evaluator.livecodebench import eval_livecodebench
 from nemo_skills.evaluation.evaluator.math import (
     Lean4ProofEvaluator,
@@ -70,6 +71,7 @@ EVALUATOR_CLASS_MAP = {
     "lean4-statement": Lean4StatementEvaluator,
     # Other evaluators can be added here as they're converted to classes
     "ioi": IOIEvaluator,
+    "icpc": ICPCEvaluator,
 }
 
 # Validation: Ensure no overlap between class and function maps
