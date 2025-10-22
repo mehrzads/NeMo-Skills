@@ -25,5 +25,6 @@ eval(
         data_dir="/workspace/llmcoding/eval_dataset/",
         output_dir="/workspace/test/",
         split="test",
+        time_min="00:30:00",
         extra_eval_args=f"++eval_config.test_file=/workspace/llmcoding/eval_dataset/ioi25/test_metadata.json",
 )
