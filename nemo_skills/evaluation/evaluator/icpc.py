@@ -152,11 +152,8 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         # Compile the solution together with optional grader/stub sources without
         # recompiling the checker/manager again.
         compile_command = (
-            f"cd {unique_dir} && "
-            f'SRC="graders/{task_args["problem_id"]}.cpp"; '
-            f'[ -e graders/grader.cpp ] && SRC="$SRC graders/grader.cpp"; '
-            f'[ -e graders/stub.cpp ] && SRC="$SRC graders/stub.cpp"; '
-            f"g++ -DEVAL -std=gnu++17 -O2 -pipe -s -o graders/{task_args['problem_id']} $SRC"
+            f"cd {unique_dir} && "            
+            f"./compile.sh"
         )
         compile_result, _ = worker_loop.run_until_complete(
             sandbox.execute_code(compile_command, language="shell", timeout=120)
@@ -287,10 +284,9 @@ class ICPCEvaluator(BaseEvaluator):
 
         # Retrieve helper scripts and grader resources from metadata instead of the dataset entry.
         problem_metadata = self.metadata[entry["icpc_id"]]
-        subtask_meta = problem_metadata[entry["subtask"]]
-        compile_code = subtask_meta["compile"]
-        run_code = subtask_meta["run"]
-        grader_files = subtask_meta["grader_files"]
+        compile_code = problem_metadata["compile"]
+        run_code = problem_metadata["run"]
+        grader_files = problem_metadata["grader_files"]
 
         if pid not in self.precompiled_cache:
             self.precompiled_cache[pid] = await asyncio.to_thread(
@@ -303,35 +299,30 @@ class ICPCEvaluator(BaseEvaluator):
             )
         pre_dir = self.precompiled_cache[pid]
 
-        subtask_state = {
-            st: {
-                "score": data["subtask_score"],
-                "precision": data["score_precision"],
-                "outputs": [],
-                "scores": [],
-                "passed": True,
-            }
-            for st, data in problem_metadata.items()
+        problem_state = {                      
+            "outputs": [],   
+            "scores": [],             
+            "passed": True,            
         }
 
-        all_tests = [(st, tname, t) for st, data in problem_metadata.items() for tname, t in data["tests"].items()]
+        all_tests = problem_metadata["tests"]
 
         batch_size = self.eval_cfg.test_batch_size
 
         for i in range(0, len(all_tests), batch_size):
-            batch = [t for t in all_tests[i : i + batch_size] if subtask_state[t[0]]["passed"]]
-            if not batch:
-                continue
+            batch = all_tests[i : i + batch_size]
 
             tasks = []
-            for _, _, test_data in batch:
+            for test_data in batch:
+                test_name, test_case = test_data
+                print(f"Test Name: {test_name}")
                 tasks.append(
                     {
                         "generated_code": completion,
                         "problem_id": pid,
                         "precompiled_dir": pre_dir,
-                        "test_input": test_data["input"],
-                        "test_output": test_data["output"],
+                        "test_input": test_case["input"],
+                        "test_output": test_case["output"],
                     }
                 )
 
@@ -340,13 +331,12 @@ class ICPCEvaluator(BaseEvaluator):
                 self.pool.starmap, run_test_case, [(ta, idx) for idx, ta in enumerate(tasks)]
             )
 
-            for (subtask, test_name, _), result in zip(batch, results):
-                st = subtask_state[subtask]
+            for (test_name, _), result in zip(batch, results):
                 result["test_name"] = test_name
-                st["outputs"].append(result)
-                st["scores"].append(float(result.get("score", 0)))
+                problem_state["outputs"].append(result)
+                problem_state["scores"].append(float(result.get("score", 0)))
                 if float(result.get("score", 0)) == 0.0:
-                    st["passed"] = False
+                    problem_state["passed"] = False
 
                 # Debug prints similar to original implementation
                 if not result.get("compile_success", True):
@@ -357,13 +347,11 @@ class ICPCEvaluator(BaseEvaluator):
                     )
 
         test_case_results = {}
-        for st, data in subtask_state.items():
-            score = round(min(data["scores"]) * data["score"], data["precision"]) if data["scores"] else 0.0
-            test_case_results[st] = {"score": score, "outputs": data["outputs"]}
+        for data in problem_state.items():
+            test_case_results = {"score": data["passed"], "outputs": data["outputs"]}
 
         return {
             "name": entry["name"],
-            "subtask": entry["subtask"],
             "test_case_results": test_case_results,
         }
 
