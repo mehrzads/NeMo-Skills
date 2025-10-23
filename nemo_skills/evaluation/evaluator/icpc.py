@@ -305,7 +305,7 @@ class ICPCEvaluator(BaseEvaluator):
             "passed": True,            
         }
 
-        all_tests = problem_metadata["tests"]
+        all_tests = [(tname, t) for tname, t in problem_metadata["tests"].items()]
 
         batch_size = self.eval_cfg.test_batch_size
 
