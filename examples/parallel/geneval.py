@@ -24,8 +24,8 @@ if benchmark == "ioi25":
             num_jobs=10,
             benchmarks="ioi25:50",
             data_dir="/workspace/llmcoding/eval_dataset/",
-            output_dir="/workspace/test/",
-            split="/workspace/eval/ioi25_50",
+            output_dir="/workspace/eval/ioi25_50",
+            split="test",
             time_min="04:00:00",
             extra_eval_args=f"++eval_config.test_file=/workspace/llmcoding/eval_dataset/ioi25/test_metadata.json",
     )
