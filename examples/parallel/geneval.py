@@ -51,7 +51,7 @@ elif benchmark == "icpc25":
             data_dir="/workspace/llmcoding/eval_dataset/",
             output_dir="/workspace/test_icpc_20/",
             split="test",
-            time_min="00:30:00",
+            time_min="01:00:00",
             extra_eval_args=f"++eval_config.test_file=/workspace/llmcoding/eval_dataset/icpc25/test_metadata.json",
     )
 else:
