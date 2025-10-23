@@ -222,10 +222,6 @@ def add_includes(code: str, problem_id: str) -> str:
         return code
     # has most of the useful functions
     code_header = "#include <bits/stdc++.h>\n"
-    # include the problem header
-    problem_header_include = f'#include "{problem_id}.h"'
-    if problem_header_include not in code:
-        code_header += problem_header_include + "\n"
     # use namespace std since models forget std:: often
     if "using namespace std;" not in code and "std::" not in code:
         code_header += "\nusing namespace std;\n\n"
