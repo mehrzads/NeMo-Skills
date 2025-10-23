@@ -29,7 +29,7 @@ if benchmark == "ioi25":
             time_min="00:30:00",
             extra_eval_args=f"++eval_config.test_file=/workspace/llmcoding/eval_dataset/ioi25/test_metadata.json",
     )
-elif benchmark == "icpc":
+elif benchmark == "icpc25":
     eval(
             ctx=wrap_arguments(
                 "++skip_filled=True "
@@ -49,7 +49,7 @@ elif benchmark == "icpc":
             num_jobs=1,
             benchmarks="icpc25:1",
             data_dir="/workspace/llmcoding/eval_dataset/",
-            output_dir="/workspace/test/",
+            output_dir="/workspace/test_icpc/",
             split="test",
             time_min="00:30:00",
             extra_eval_args=f"++eval_config.test_file=/workspace/llmcoding/eval_dataset/icpc25/test_metadata.json",
