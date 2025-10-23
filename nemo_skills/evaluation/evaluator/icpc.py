@@ -346,13 +346,10 @@ class ICPCEvaluator(BaseEvaluator):
                         f"--- STDERR ---\n{result.get('compile_stderr', '').strip()}\n"
                     )
 
-        test_case_results = {}
-        for data in problem_state.items():
-            test_case_results = {"score": data["passed"], "outputs": data["outputs"]}
-
+        test_case_results = { "score": problem_state["passed"], "outputs": problem_state["outputs"] }        
         return {
             "name": entry["name"],
-            "test_case_results": test_case_results,
+            "test_case_results": test_case_results
         }
 
     async def eval_full(self, input_files):  # type: ignore[override]
