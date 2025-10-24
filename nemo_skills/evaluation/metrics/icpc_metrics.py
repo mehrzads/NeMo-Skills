@@ -25,7 +25,7 @@ class ICPCMetrics(BaseMetrics):
         super().update(predictions)
 #        self._compute_pass_at_k(predictions)
         if predictions:
-            print("1. predictions[0]["name"]:", predictions[0]["name"])
+            print("1. predictions[0]['name']: ", predictions[0]['name'], " predictions[0]['test_case_results']: ", predictions[0]['test_case_results'])
             print("2. len(predictions):", len(predictions))
             self.predictions_by_problem[predictions[0]["name"]].extend(predictions)
 
