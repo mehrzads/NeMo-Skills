@@ -32,40 +32,39 @@ class ICPCMetrics(BaseMetrics):
     def _get_score_dict(self, p):
         return {"correct": all(r["score"] > 0 for r in p["test_case_results"].values())}
 
-    def get_problem_score(self, submissions) -> float:
-        """
-        For a given problem (list of submissions), compute the score as follows:
-          - For each subtask, take the maximum score over all submissions.
-          - Sum these maximum scores to get the problem score.
-        """
-        if not submissions:
-            return 0.0
-        subtask_scores = {}
-
-        for submission in submissions:
-            name = submission["name"]
-            result = submission["test_case_results"]
-            if result["score"]:
-                subtask_scores[name] = True;  
-            else:
-                if subtask_scores.get(name) is None:
-                    subtask_scores[name] = False;    
-            print("3. name, subtask_scores[name]:", name, subtask_scores[name])      
-        return subtask_scores
+    def get_problem_score(self, submission) -> bool:
+        if not submission:
+            return False
+        if submission["test_case_results"]["score"]:
+            return True
+        else:
+            return False
 
  
 
     def get_metrics(self):
         total_score = total_round_robin = 0.0
         self.problem_scores = {}
-        for name, submissions in self.predictions_by_problem.items():
-            scores = self.get_problem_score(submissions)
-            self.problem_scores[name] = scores
-            print("4. name, scores:", name, scores)
+        self.correct_submissions = {}
+        self.total_submissions = {}
+        for name, submission in self.predictions_by_problem.items():
+            if self.correct_submissions.get(name) is None:
+                    self.correct_submissions[name] = 0
+            if self.total_submissions.get(name) is None:
+                self.total_submissions[name] = 0
+            if self.problem_scores.get(name) is None:
+                self.problem_scores[name] = False
+            if self.get_problem_score(submission):                
+                self.correct_submissions[name] += 1
+                self.problem_scores[name] = True
+            self.total_submissions[name] += 1    
         self.print_problem_scores()
-        metrics_dict = super().get_metrics()
-        for m in metrics_dict.values():
-            m["total_score"] = str(total_score)
+        metrics_dict = {}
+        for name, scores in self.problem_scores.items():
+            metrics_dict[name] = {
+                "correct": self.correct_submissions[name],
+                "total": self.total_submissions[name]
+            }
         return metrics_dict
 
     def reset(self):
@@ -76,4 +75,4 @@ class ICPCMetrics(BaseMetrics):
     def print_problem_scores(self):
         print("---------------------------------Problem and subtask scores---------------------------------")       
         for name, scores in self.problem_scores.items():
-            print(f"# {name}: {scores}")
+            print(f"# {name}: {scores} self.correct_submissions[name]: {self.correct_submissions[name]} self.total_submissions[name]: {self.total_submissions[name]}")
