@@ -1,7 +1,7 @@
 from nemo_skills.pipeline.eval import eval
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
 
-benchmark = "icpc25"
+benchmark = "ioi25"
 if benchmark == "ioi25":
 
 
