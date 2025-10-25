@@ -24,15 +24,14 @@ class ICPCMetrics(BaseMetrics):
     def update(self, predictions):
         super().update(predictions)
 #        self._compute_pass_at_k(predictions)
-        if predictions:
-            print("1. predictions[0]['name']: ", predictions[0]['name'], " predictions[0]['test_case_results']: ", predictions[0]['test_case_results'])
-            print("2. len(predictions):", len(predictions))
+        if predictions:            
             self.predictions_by_problem[predictions[0]["name"]].extend(predictions)
 
     def _get_score_dict(self, p):
         return {"correct": all(r["score"] > 0 for r in p["test_case_results"].values())}
 
-    def get_problem_score(self, submission) -> bool:
+    def get_problem_score(self, submissions) -> bool:
+        submission = submissions[0]
         if not submission:
             return False
         if submission["test_case_results"]["score"]:
