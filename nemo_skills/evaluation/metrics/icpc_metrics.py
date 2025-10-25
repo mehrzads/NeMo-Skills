@@ -60,7 +60,7 @@ class ICPCMetrics(BaseMetrics):
         self.print_problem_scores()
         metrics_dict = {}
         for name, scores in self.problem_scores.items():
-            metrics_dict[name] = {
+            metrics_dict["icpc25"][name] = {
                 "correct": self.correct_submissions[name],
                 "total": self.total_submissions[name]
             }

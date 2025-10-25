@@ -2,7 +2,7 @@ from nemo_skills.pipeline.eval import eval
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
 
 benchmark = "ioi25_diversity"
-if benchmark == "ioi25":
+if benchmark == "icpc25":
 
 
     eval(
