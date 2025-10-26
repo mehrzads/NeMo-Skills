@@ -14,6 +14,7 @@
 from collections import defaultdict
 
 from nemo_skills.evaluation.metrics.base import BaseMetrics
+from nemo_skills.evaluation.metrics.base import BaseMetrics, as_int, as_percentage
 
 
 class ICPCMetrics(BaseMetrics):
@@ -69,6 +70,11 @@ class ICPCMetrics(BaseMetrics):
     def evaluations_to_print(self):
         """Returns all problem names."""
         return list(self.problem_scores.keys())
+
+    def metrics_to_print(self):
+        metrics_to_print = {"correct": as_int, "total": as_int}
+        return metrics_to_print
+
 
     def reset(self):
         super().reset()
