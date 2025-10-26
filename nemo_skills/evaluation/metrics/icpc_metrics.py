@@ -33,13 +33,12 @@ class ICPCMetrics(BaseMetrics):
 
     def get_problem_score(self, submissions) -> bool:
         submission = submissions[0]
-        if not submission:
-            return False
-        if submission["test_case_results"]["score"]:
-            return True
-        else:
-            return False
-
+        scores = []
+        for submission in submissions:
+            scores.append(submission["test_case_results"]["score"])            
+        return scores
+        
+        
  
 
     def get_metrics(self):
@@ -54,10 +53,10 @@ class ICPCMetrics(BaseMetrics):
                 self.total_submissions[name] = 0
             if self.problem_scores.get(name) is None:
                 self.problem_scores[name] = False
-            if self.get_problem_score(submission):                
-                self.correct_submissions[name] += 1
-                self.problem_scores[name] = True
-            self.total_submissions[name] += 1    
+            scores =self.get_problem_score(submission)              
+            self.correct_submissions[name] += sum(1 for value in scores.values() if value)
+            self.problem_scores[name] = sum(1 for value in scores.values() if value) > 0
+            self.total_submissions[name] += len(submission)   
         self.print_problem_scores()
         metrics_dict = {}
         for name, scores in self.problem_scores.items():
