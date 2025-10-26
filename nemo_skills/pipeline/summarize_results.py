@@ -311,6 +311,7 @@ def summarize_results(
             input_files = [f"{benchmark_path}/output.jsonl"]
 
         metrics = metrics_calculator.compute_metrics(input_files=input_files)
+        print("metrics: ", metrics)
         if len(metrics) > 1:  # has subsets
             for subset, subset_metrics in metrics.items():
                 results[get_subset_name(benchmark, subset)].update(subset_metrics)
@@ -324,7 +325,9 @@ def summarize_results(
         else:
             metrics_to_print[benchmark] = metrics_calculator.metrics_to_print()
             evaluations_to_print[benchmark] = metrics_calculator.evaluations_to_print()
-
+        print("results: ", results)
+        print("metrics_to_print: ", metrics_to_print)
+        print("evaluations_to_print: ", evaluations_to_print)
     # grouping benchmarks that have a "." e.g ruler.niah_single_1, ruler.niah_single_2 -> ruler
     # to report average numbers
     add_benchmark_groups(results, metrics_to_print, evaluations_to_print)
