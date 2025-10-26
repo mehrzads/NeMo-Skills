@@ -54,8 +54,8 @@ class ICPCMetrics(BaseMetrics):
             if self.problem_scores.get(name) is None:
                 self.problem_scores[name] = False
             scores =self.get_problem_score(submission)              
-            self.correct_submissions[name] += sum(1 for value in scores.values() if value)
-            self.problem_scores[name] = sum(1 for value in scores.values() if value) > 0
+            self.correct_submissions[name] += sum(1 for value in scores if value)
+            self.problem_scores[name] = sum(1 for value in scores if value) > 0
             self.total_submissions[name] += len(submission)   
         self.print_problem_scores()
         metrics_dict = {}
