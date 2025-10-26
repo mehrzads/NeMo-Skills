@@ -74,7 +74,7 @@ elif benchmark == "icpc25":
             model=f"/hf_models/gpt-oss-120b",
             server_type='vllm',
             server_gpus=8,
-            num_jobs=1,
+            num_jobs=10,
             benchmarks="icpc25:50",
             data_dir="/workspace/llmcoding/eval_dataset/",
             output_dir="/workspace/eval/icpc_50/",
