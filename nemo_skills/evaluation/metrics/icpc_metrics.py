@@ -14,7 +14,7 @@
 from collections import defaultdict
 
 from nemo_skills.evaluation.metrics.base import BaseMetrics
-from nemo_skills.evaluation.metrics.base import BaseMetrics, as_int, as_percentage
+from nemo_skills.evaluation.metrics.base import BaseMetrics, as_int, as_percentage, as_float
 
 
 class ICPCMetrics(BaseMetrics):
@@ -65,14 +65,18 @@ class ICPCMetrics(BaseMetrics):
                 "correct": self.correct_submissions[name],
                 "total": self.total_submissions[name]
             }
+        metrics_dict["total"] = {
+            "solved": sum(1 for value in self.correct_submissions.values() if value > 0),
+            "average_run_time": sum(self.total_submissions.values()) / len(self.total_submissions.values())    
+        }
         return metrics_dict
 
     def evaluations_to_print(self):
         """Returns all problem names."""
-        return list(self.problem_scores.keys())
+        return ["total"] + list(self.problem_scores.keys())
 
     def metrics_to_print(self):
-        metrics_to_print = {"correct": as_int, "total": as_int}
+        metrics_to_print = {"correct": as_int, "total": as_int, "solved": as_int, "average_run_time": as_float}
         return metrics_to_print
 
 
