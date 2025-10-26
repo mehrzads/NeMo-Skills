@@ -35,7 +35,7 @@ elif benchmark == "ioi25_diversity":
     eval(
             ctx=wrap_arguments(
                 "++skip_filled=True "
-                "++prompt_config=/workspace/prompts/diversity.yaml"
+                "++prompt_config=/workspace/prompts/diversity.yaml "
                 "++inference.temperature=1.0 "
                 "++inference.top_p=1.0 "
                 "++inference.tokens_to_generate=120000 " 
