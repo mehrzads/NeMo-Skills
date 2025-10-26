@@ -66,6 +66,10 @@ class ICPCMetrics(BaseMetrics):
             }
         return metrics_dict
 
+    def evaluations_to_print(self):
+        """Returns all problem names."""
+        return list(self.problem_scores.keys())
+
     def reset(self):
         super().reset()
         self.predictions_by_problem = defaultdict(list)
