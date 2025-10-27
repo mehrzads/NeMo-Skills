@@ -136,9 +136,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
 
         # Prepare input and expected output files
         file_creation_commands.append(f"cat <<'_EOT_' > {unique_dir}/input.txt\n{task_args['test_input']}\n_EOT_\n")
-        file_creation_commands.append(
-            f"cat <<'_EOT_' > {unique_dir}/correct_output.txt\n{task_args['test_output']}\n_EOT_\n"
-        )
+        
 
         setup_script = "\n".join(file_creation_commands)
         sandbox = LocalSandbox()
@@ -148,6 +146,17 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         if setup_result.get("stderr"):
             raise Exception(f"File setup failed: {setup_result['stderr']}")
 
+        #prepare the output file
+        file_creation_commands = []
+        file_creation_commands.append(
+            f"cat <<'_EOT_' > {unique_dir}/correct_output.txt\n{task_args['test_output']}\n_EOT_\n"
+        )
+        setup_script = "\n".join(file_creation_commands)
+        setup_result, _ = worker_loop.run_until_complete(
+            sandbox.execute_code(setup_script, language="shell", timeout=120)
+        )
+        if setup_result.get("stderr"):
+            raise Exception(f"File setup failed: {setup_result['stderr']}")
         # 2. Compile only the problem solution (skip checker/grader recompilation)
         # Compile the solution together with optional grader/stub sources without
         # recompiling the checker/manager again.
