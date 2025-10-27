@@ -93,7 +93,7 @@ elif benchmark == "icpc25_diversity":
                 "++inference.extra_body.reasoning_effort=high "
                 "++max_concurrent_requests=1024 "
             ),
-            cluster="oci-iad-mz",
+            cluster="iad",
             with_sandbox=True,
             expname=f"icpc_diversity_eval_run",
             model=f"/hf_models/gpt-oss-120b",
