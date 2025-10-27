@@ -1,7 +1,7 @@
 from nemo_skills.pipeline.eval import eval
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
 
-benchmark = "icpc25_diversity"
+benchmark = "icpc25"
 if benchmark == "ioi25":
 
 
@@ -68,7 +68,7 @@ elif benchmark == "icpc25":
                 "++inference.extra_body.reasoning_effort=high "
                 "++max_concurrent_requests=1024 "
             ),
-            cluster="oci-ord-mz",
+            cluster="iad",
             with_sandbox=True,
             expname=f"icpc_eval_run",
             model=f"/hf_models/gpt-oss-120b",
