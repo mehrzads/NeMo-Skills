@@ -62,8 +62,8 @@ class ICPCMetrics(BaseMetrics):
 
             self.total_submissions[name] += len(submission)
         metrics_dict = {}
-        for name, num_submisions in self.total_submissions.keys():
-            metrics_dict[name] = {"sample_correct": self.correct_sample_submissions[name], "test_correct": self.correct_submissions[name], "total": num_submisions}
+        for name in self.total_submissions.keys():
+            metrics_dict[name] = {"sample_correct": self.correct_sample_submissions[name], "test_correct": self.correct_submissions[name], "total": self.total_submissions[name]}
         
         metrics_dict["total"] = {
             "solved": sum(1 for value in self.correct_submissions.values() if value > 0),
