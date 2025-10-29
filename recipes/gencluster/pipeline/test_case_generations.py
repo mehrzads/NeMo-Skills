@@ -6,7 +6,7 @@ if __name__ == "__main__":
     cluster = "iad"
     model_name = "gpt-oss-120b"
     model_path = f"/hf_models/{model_name}"
-    input_file = "/workspace/llmcoding/eval_dataset/icpc25/test.json"
+    input_file = "/workspace/llmcoding/eval_dataset/icpc25/test.jsonl"
     output_dir = f"/workspace/{model_name}/gencluster/"
     expname = "icpc25_test_case_generations"
     model_path = "/hf_models/gpt-oss-120b"
