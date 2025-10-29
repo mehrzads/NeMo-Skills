@@ -58,7 +58,7 @@ class ICPCMetrics(BaseMetrics):
             metrics_dict[name] = {"correct": self.correct_submissions[name], "total": self.total_submissions[name]}
         metrics_dict["total"] = {
             "solved": sum(1 for value in self.correct_submissions.values() if value > 0),
-            "average_run_time": sum(self.total_submissions.values()) / len(self.total_submissions.values()),
+            "average_number_of_runs": sum(self.total_submissions.values()) / len(self.total_submissions.values()),
         }
         return metrics_dict
 
