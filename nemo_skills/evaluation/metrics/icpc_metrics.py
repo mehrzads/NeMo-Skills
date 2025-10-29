@@ -50,6 +50,8 @@ class ICPCMetrics(BaseMetrics):
                 self.correct_submissions[name] = 0
             if self.total_submissions.get(name) is None:
                 self.total_submissions[name] = 0
+            if self.correct_sample_submissions.get(name) is None:
+                self.correct_sample_submissions[name] = 0
             if self.problem_scores.get(name) is None:
                 self.problem_scores[name] = False
             scores = self.get_problem_score(submission)
