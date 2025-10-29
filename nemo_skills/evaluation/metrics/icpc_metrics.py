@@ -45,6 +45,7 @@ class ICPCMetrics(BaseMetrics):
         self.problem_scores = {}
         self.correct_submissions = {}
         self.total_submissions = {}
+        self.correct_sample_submissions = {}
         for name, submission in self.predictions_by_problem.items():
             if self.correct_submissions.get(name) is None:
                 self.correct_submissions[name] = 0
