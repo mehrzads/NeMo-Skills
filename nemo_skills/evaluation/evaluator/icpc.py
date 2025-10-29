@@ -303,10 +303,14 @@ class ICPCEvaluator(BaseEvaluator):
         problem_state = {
             "outputs": [],
             "scores": [],
-            "passed": True,
+            "sample_passed": True,
+            "test_passed": True,
         }
 
-        all_tests = [(tname, t) for tname, t in problem_metadata["tests"].items()]
+
+        all_tests =  [(tname, t, "sample") for tname, t in problem_metadata["sample_tests"].items()]
+        all_tests =  all_tests + [(tname, t, "test") for tname, t in problem_metadata["tests"].items()]
+        
 
         batch_size = self.eval_cfg.test_batch_size
 
@@ -332,12 +336,17 @@ class ICPCEvaluator(BaseEvaluator):
                 self.pool.starmap, run_test_case, [(ta, idx) for idx, ta in enumerate(tasks)]
             )
 
-            for (test_name, _), result in zip(batch, results):
+            for (test_name, _, test_type), result in zip(batch, results):
                 result["test_name"] = test_name
+                result["test_type"] = test_type
                 problem_state["outputs"].append(result)
                 problem_state["scores"].append(float(result.get("score", 0)))
-                if float(result.get("score", 0)) == 0.0:
-                    problem_state["passed"] = False
+                if test_type == "sample":
+                    if float(result.get("score", 0)) == 0.0:
+                        problem_state["sample_passed"] = False
+                else:
+                    if float(result.get("score", 0)) == 0.0:
+                        problem_state["test_passed"] = False
 
                 # Debug prints similar to original implementation
                 if not result.get("compile_success", True):
@@ -347,7 +356,7 @@ class ICPCEvaluator(BaseEvaluator):
                         f"--- STDERR ---\n{result.get('compile_stderr', '').strip()}\n"
                     )
 
-        test_case_results = {"score": problem_state["passed"], "outputs": problem_state["outputs"]}
+        test_case_results = { "sample_score": problem_state["sample_passed"],  "score": problem_state["test_passed"], "outputs": problem_state["outputs"]}
         return {"name": entry["name"], "test_case_results": test_case_results}
 
     async def eval_full(self, input_files):  # type: ignore[override]
