@@ -319,7 +319,7 @@ class ICPCEvaluator(BaseEvaluator):
 
             tasks = []
             for test_data in batch:
-                test_name, test_case = test_data
+                test_name, test_case, test_type = test_data
                 print(f"Test Name: {test_name}")
                 tasks.append(
                     {
