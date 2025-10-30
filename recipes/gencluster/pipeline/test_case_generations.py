@@ -63,3 +63,18 @@ if __name__ == "__main__":
         with_sandbox=True,
     )
 
+    genrate_tests_command = f"python /nemo_run/code/recipes/gencluster/scripts/extract_cpp_code.py --input_dir {output_dir}"
+    run_cmd(
+        ctx=wrap_arguments(""), 
+        cluster=cluster,
+        command=genrate_tests_command,
+        expname=expname+"_tests",
+        log_dir=str(output_dir+"/tests"),
+        num_nodes=1,
+        num_gpus=0,
+        with_sandbox=True,
+        get_random_port=True,
+        run_after=[expname+"_generators", expname+"_validators"],
+        exclusive=True,
+        time_min="04:00:00",
+    )
