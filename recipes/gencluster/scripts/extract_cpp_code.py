@@ -44,21 +44,12 @@ def compile_cpp_file(cpp_file_path, binary_dir):
     except Exception as e:
         return False, "Error", str(e)
 
-def process_jsonl_file(jsonl_path, output_dir, binary_dir, folder_name, file_id, source_id):
-    """Process a single JSONL file and extract C++ code blocks for a given source (rs0/rs1)"""
+def process_jsonl_file(jsonl_path, output_dir, binary_dir, folder_name, source_id):
+    """Process a single JSONL file; use per-line 'id' to organize outputs."""
     extracted_count = 0
     compiled_count = 0
     compilation_results = []
-    
-    # Create organized directory structure: problem_X/gen or problem_X/val
-    problem_dir = output_dir / f"problem_{file_id}"
-    problem_type_dir = problem_dir / ("gen" if folder_name == "ioi_gen" else "val")
-    problem_type_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Create corresponding binary directory structure
-    binary_problem_dir = binary_dir / f"problem_{file_id}"
-    binary_type_dir = binary_problem_dir / ("gen" if folder_name == "ioi_gen" else "val")
-    binary_type_dir.mkdir(parents=True, exist_ok=True)
+    split_dir = "gen" if folder_name == "generators" else "val"
     
     try:
         with open(jsonl_path, 'r', encoding='utf-8') as file:
@@ -67,12 +58,22 @@ def process_jsonl_file(jsonl_path, output_dir, binary_dir, folder_name, file_id,
                     # Parse JSON line
                     data = json.loads(line.strip())
                     generation = data.get('generation', '')
+                    pid = str(data.get('id', '')).strip()
                     
-                    if generation:
+                    if generation and pid:
                         # Extract C++ code
                         cpp_code = extract_final_cpp_block(generation)
                         
                         if cpp_code.strip():  # Only save if there's actual code
+                            # Ensure per-problem directories exist using per-line id
+                            problem_dir = output_dir / f"problem_{pid}"
+                            problem_type_dir = problem_dir / split_dir
+                            problem_type_dir.mkdir(parents=True, exist_ok=True)
+
+                            binary_problem_dir = binary_dir / f"problem_{pid}"
+                            binary_type_dir = binary_problem_dir / split_dir
+                            binary_type_dir.mkdir(parents=True, exist_ok=True)
+
                             # Create organized filename including source to avoid collisions across rs0/rs1
                             output_filename = f"{source_id}_line_{line_num}.cpp"
                             output_path = problem_type_dir / output_filename
@@ -82,7 +83,7 @@ def process_jsonl_file(jsonl_path, output_dir, binary_dir, folder_name, file_id,
                                 cpp_file.write(cpp_code.strip())
                             
                             extracted_count += 1
-                            relative_path = f"problem_{file_id}/{'gen' if folder_name == 'ioi_gen' else 'val'}/{output_filename}"
+                            relative_path = f"problem_{pid}/{split_dir}/{output_filename}"
                             print(f"Extracted C++ code to: {relative_path}")
                             
                             # Compile the C++ file
@@ -160,16 +161,12 @@ def main():
 
         for fpath in jsonl_files:
             print(f"\nProcessing: {fpath.relative_to(base_dir)}")
-            # Use parent directory name as file_id if numeric, else use filename stem
-            parent = fpath.parent.name
-            file_id = parent if parent.isdigit() else fpath.stem
             rs = fpath.stem  # best-effort identifier
             extracted, compiled, compilation_results = process_jsonl_file(
                 fpath,
                 output_dir,
                 binary_dir,
                 folder_name,
-                file_id,
                 rs
             )
 
@@ -194,8 +191,8 @@ def main():
     print(f"\nDirectory structure:")
     print(f"  {output_dir}/")
     print(f"    problem_*/")
-    print(f"      gen/        (from ioi_gen)")
-    print(f"      val/        (from ioi_val)")
+    print(f"      gen/        (from generators)")
+    print(f"      val/        (from validators)")
     print(f"  {binary_dir}/")
     print(f"    problem_*/")
     print(f"      gen/        (compiled binaries)")

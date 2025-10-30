@@ -69,7 +69,7 @@ if __name__ == "__main__":
         cluster=cluster,
         command=genrate_tests_command,
         expname=expname+"_tests",
-        log_dir=str(output_dir+"/tests"),
+        log_dir=str(output_dir+"/test_case_generations_logs"),
         num_nodes=1,
         num_gpus=0,
         with_sandbox=True,
