@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import logging
 import os
 import sys
@@ -103,6 +104,48 @@ def get_timeout_str(cluster_config, partition, with_save_delay: bool = True) -> 
     timeout = _get_timeout(cluster_config, partition, with_save_delay=with_save_delay)
     timeout_str = f"{timeout.days:02d}:{timeout.seconds // 3600:02d}:{(timeout.seconds % 3600) // 60:02d}:{timeout.seconds % 60:02d}"
     return timeout_str
+
+
+def parse_sbatch_kwargs(sbatch_kwargs: str | dict | None, **kwargs) -> dict | None:
+    """
+    Parse sbatch kwargs from either a JSON string or a dictionary.
+
+    This utility function handles sbatch kwargs that can be provided in two ways:
+    1. As a JSON string (typically from CLI)
+    2. As a dictionary (when invoked from Python code)
+
+    Args:
+        sbatch_kwargs: Either a JSON string or a dictionary containing sbatch kwargs.
+                         Can also be None or empty string.
+        **kwargs: any additional keyword arguments to include in the resulting dictionary.
+            Any values of None will be ignored.
+
+    Returns:
+        A dictionary of slurm kwargs, or None if no arguments are provided.
+
+    Raises:
+        ValueError: If sbatch_kwargs is a string but cannot be parsed as JSON.
+    """
+    full_sbatch_kwargs = {key: value for key, value in kwargs.items() if value is not None}
+
+    if sbatch_kwargs:
+        if isinstance(sbatch_kwargs, dict):
+            # Already a dictionary, just update
+            full_sbatch_kwargs.update(sbatch_kwargs)
+        elif isinstance(sbatch_kwargs, str):
+            # Parse JSON string
+            try:
+                sbatch_kwargs = json.loads(sbatch_kwargs)
+                full_sbatch_kwargs.update(sbatch_kwargs)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Failed to parse sbatch_kwargs with JSON: {e}")
+        else:
+            raise ValueError(f"sbatch_kwargs must be a string or dict, got {type(sbatch_kwargs).__name__}")
+
+    if not len(full_sbatch_kwargs):
+        return None
+
+    return full_sbatch_kwargs
 
 
 def get_env_variables(cluster_config):
