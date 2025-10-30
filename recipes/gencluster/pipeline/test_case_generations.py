@@ -12,9 +12,9 @@ if __name__ == "__main__":
     model_path = "/hf_models/gpt-oss-120b"
     server_type = "vllm"
     server_gpus = 8
-    server_nodes = 1
+    server_nodes = 10
     server_args = "--async-scheduling --max-num-seqs=1024"
-    num_runs = 1
+    num_runs = 10
     generate(
         ctx=wrap_arguments(
             "++skip_filled=True "
@@ -63,7 +63,7 @@ if __name__ == "__main__":
         with_sandbox=True,
     )
 
-    genrate_tests_command = f"python /nemo_run/code/recipes/gencluster/scripts/extract_cpp_code.py --input_dir {output_dir} ; python /nemo_run/code/recipes/gencluster/scripts/generate_tests.py 1 --min-validators 1 --base-dir {output_dir}"
+    genrate_tests_command = f"python /nemo_run/code/recipes/gencluster/scripts/extract_cpp_code.py --input_dir {output_dir} ; python /nemo_run/code/recipes/gencluster/scripts/generate_tests.py 100 --min-validators 75 --base-dir {output_dir}"
     run_cmd(
         ctx=wrap_arguments(""), 
         cluster=cluster,
