@@ -12,9 +12,9 @@ if __name__ == "__main__":
     model_path = "/hf_models/gpt-oss-120b"
     server_type = "vllm"
     server_gpus = 8
-    server_nodes = 10
+    server_nodes = 1
     server_args = "--async-scheduling --max-num-seqs=1024"
-    num_runs = 10
+    num_runs = 100
     generate(
         ctx=wrap_arguments(
             "++skip_filled=True "
