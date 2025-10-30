@@ -63,7 +63,7 @@ if __name__ == "__main__":
         with_sandbox=True,
     )
 
-    genrate_tests_command = f"python /nemo_run/code/recipes/gencluster/scripts/extract_cpp_code.py --input_dir {output_dir} ; python /nemo_run/code/recipes/gencluster/scripts/generate_tests.py 1 --min-validators 1 --base_dir {output_dir}"
+    genrate_tests_command = f"python /nemo_run/code/recipes/gencluster/scripts/extract_cpp_code.py --input_dir {output_dir} ; python /nemo_run/code/recipes/gencluster/scripts/generate_tests.py 1 --min-validators 1 --base-dir {output_dir}"
     run_cmd(
         ctx=wrap_arguments(""), 
         cluster=cluster,
