@@ -77,18 +77,44 @@ def run_generator(gen_binary_path, timeout=10, *, loop=None, sandbox: LocalSandb
     except Exception as e:
         return False, f"Generator error: {str(e)}"
 
-def run_validator(val_binary_path, test_data, timeout=10, *, loop=None, sandbox: LocalSandbox = None):
+
+def run_generator_to_sandbox_file(gen_binary_path, timeout=10, *, loop=None, sandbox: LocalSandbox = None):
+    """Run generator inside sandbox and write its stdout to a sandbox temp file. Returns (success, sandbox_tmp_path_or_error)."""
+    if sandbox is None or loop is None:
+        return False, "Sandbox not available"
+    try:
+        quoted_bin = shlex.quote(str(gen_binary_path))
+        script = (
+            f"tmp_file=$(mktemp)\n"
+            f"{quoted_bin} > \"$tmp_file\"\n"
+            f"echo \"$tmp_file\"\n"
+        )
+        result, _ = loop.run_until_complete(
+            sandbox.execute_code(script, language="shell", timeout=timeout)
+        )
+        if result.get("process_status") == "timeout":
+            return False, "Generator timed out"
+        if result.get("process_status") != "completed":
+            return False, result.get("stderr", "Generator failed")
+        # The last line of stdout is the temp path
+        stdout = result.get("stdout", "").strip()
+        tmp_path = stdout.splitlines()[-1] if stdout else ""
+        if not tmp_path:
+            return False, "Failed to build sandbox temp file path"
+        return True, tmp_path
+    except Exception as e:
+        return False, f"Generator error: {str(e)}"
+
+def run_validator(val_binary_path, test_data, timeout=10, *, loop=None, sandbox: LocalSandbox = None, input_path_in_sandbox: str = None):
     """Run a validator binary with test data as stdin"""
     # Prefer sandbox if provided
     if sandbox is not None and loop is not None:
         try:
             quoted_bin = shlex.quote(str(val_binary_path))
-            script = (
-                f"input_file=$(mktemp)\n"
-                f"cat > \"$input_file\" << 'EOF'\n{test_data}\nEOF\n"
-                f"{quoted_bin} < \"$input_file\"\n"
-                f"rm -f \"$input_file\"\n"
-            )
+            if not input_path_in_sandbox:
+                return "error"
+            quoted_in = shlex.quote(input_path_in_sandbox)
+            script = f"{quoted_bin} < {quoted_in}\n"
             result, _ = loop.run_until_complete(
                 sandbox.execute_code(script, language="shell", timeout=timeout)
             )
@@ -128,13 +154,13 @@ def run_validator(val_binary_path, test_data, timeout=10, *, loop=None, sandbox:
     except Exception as e:
         return "error"
 
-def validate_dataset(test_data, val_binaries, min_validators=7, *, loop=None, sandbox: LocalSandbox = None):
+def validate_dataset(test_data, val_binaries, min_validators=7, *, loop=None, sandbox: LocalSandbox = None, sandbox_input_path: str = None):
     """Validate test data against all validators and return if it passes threshold"""
     validation_results = []
     passed_count = 0
     
     for val_binary in val_binaries:
-        result = run_validator(val_binary, test_data, loop=loop, sandbox=sandbox)
+        result = run_validator(val_binary, test_data, loop=loop, sandbox=sandbox, input_path_in_sandbox=sandbox_input_path)
         validation_results.append({
             'validator': val_binary.name,
             'result': result
@@ -204,21 +230,30 @@ def generate_datasets_for_problem(problem_dir, binary_dir, output_dir, n_dataset
 
         print(f"Attempt {attempt_no}: Using generator {gen_path.name}...")
 
-        success, test_data = run_generator(gen_path, loop=loop, sandbox=sandbox)
-        if not success:
-            print(f"  ❌ Generator failed: {test_data}")
+        gen_ok = False
+        sandbox_tmp_path = None
+        # Use sandbox temp file to avoid moving data around
+        gen_ok, gen_out = run_generator_to_sandbox_file(gen_path, loop=loop, sandbox=sandbox)
+        if not gen_ok:
+            print(f"  ❌ Generator failed: {gen_out}")
             return {
                 'status': 'gen_failed',
                 'gen': gen_path,
             }
+        sandbox_tmp_path = gen_out
 
         is_valid, passed_count, total_validators, validation_results = validate_dataset(
-            test_data, val_binaries, min_validators, loop=loop, sandbox=sandbox
+            None, val_binaries, min_validators, loop=loop, sandbox=sandbox, sandbox_input_path=sandbox_tmp_path
         )
 
         if is_valid:
             with lock:
                 if saved_count >= n_datasets:
+                    # cleanup sandbox temp
+                    try:
+                        loop.run_until_complete(sandbox.execute_code(f'rm -f {shlex.quote(sandbox_tmp_path)}', language="shell", timeout=5))
+                    except Exception:
+                        pass
                     return {'status': 'skipped_full', 'gen': gen_path}
                 dataset_idx = next_index
                 next_index += 1
@@ -226,8 +261,25 @@ def generate_datasets_for_problem(problem_dir, binary_dir, output_dir, n_dataset
 
             dataset_filename = f"dataset_{dataset_idx:03d}.txt"
             dataset_path = problem_output_dir / dataset_filename
-            with open(dataset_path, 'w') as f:
-                f.write(test_data)
+            # Retrieve content from sandbox temp file to save locally
+            try:
+                cat_res, _ = loop.run_until_complete(
+                    sandbox.execute_code(f'cat {shlex.quote(sandbox_tmp_path)}', language="shell", timeout=30)
+                )
+                if cat_res.get("process_status") != "completed":
+                    raise RuntimeError(cat_res.get("stderr", "Failed to read sandbox file"))
+                with open(dataset_path, 'w') as f:
+                    f.write(cat_res.get("stdout", ""))
+            except Exception as e:
+                print(f"  ❌ Failed to save dataset from sandbox: {e}")
+                try:
+                    loop.run_until_complete(sandbox.execute_code(f'rm -f {shlex.quote(sandbox_tmp_path)}', language="shell", timeout=5))
+                except Exception:
+                    pass
+                return {
+                    'status': 'gen_failed',
+                    'gen': gen_path,
+                }
 
             report_filename = f"dataset_{dataset_idx:03d}_validation.json"
             report_path = problem_output_dir / report_filename
@@ -243,6 +295,11 @@ def generate_datasets_for_problem(problem_dir, binary_dir, output_dir, n_dataset
                 json.dump(validation_report, f, indent=2)
 
             print(f"  ✅ Dataset {saved_count}/{n_datasets} saved: {passed_count}/{total_validators} validators passed")
+            # Cleanup sandbox temp file
+            try:
+                loop.run_until_complete(sandbox.execute_code(f'rm -f {shlex.quote(sandbox_tmp_path)}', language="shell", timeout=5))
+            except Exception:
+                pass
             return {
                 'status': 'saved',
                 'gen': gen_path,
@@ -254,6 +311,11 @@ def generate_datasets_for_problem(problem_dir, binary_dir, output_dir, n_dataset
             print(f"  ⛔ Dropping generator {gen_path.name} due to failed validation")
             with lock:
                 active_gens = [g for g in active_gens if g != gen_path]
+            # Cleanup sandbox temp file
+            try:
+                loop.run_until_complete(sandbox.execute_code(f'rm -f {shlex.quote(sandbox_tmp_path)}', language="shell", timeout=5))
+            except Exception:
+                pass
             return {
                 'status': 'validation_failed',
                 'gen': gen_path,
