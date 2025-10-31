@@ -7,6 +7,7 @@ import json
 import argparse
 from pathlib import Path
 from nemo_skills.code_execution.sandbox import LocalSandbox
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def extract_final_cpp_block(text):
     """Extract the final C++ code block from text using the provided pattern"""
@@ -34,9 +35,8 @@ def compile_cpp_file(cpp_file_path, binary_dir, sandbox, loop):
     binary_name = cpp_file.stem
     binary_path = binary_dir / binary_name
 
-    # Ensure binary directory exists
-    mkdir_cmd = f"mkdir -p {binary_dir}"
-    loop.run_until_complete(sandbox.execute_code(mkdir_cmd, language="shell", timeout=30))
+    # Ensure binary directory exists (use Python, not sandbox)
+    binary_dir.mkdir(parents=True, exist_ok=True)
 
     # Compile using gnu++17 similar to evaluators
     compile_cmd = (
@@ -126,6 +126,7 @@ def main():
     # Parse arguments
     parser = argparse.ArgumentParser(description="Extract and compile C++ code from JSONL under generators/ and validators/")
     parser.add_argument("--input_dir", required=True, help="Input directory containing generators/ and validators/ folders")
+    parser.add_argument("--workers", type=int, default=(os.cpu_count() or 4), help="Number of parallel worker threads")
     args = parser.parse_args()
 
     # Base directory
@@ -158,8 +159,18 @@ def main():
     except Exception:
         print("✗ Failed to verify g++ inside sandbox")
         return
-    """
-    # Process both generators and validators folders
+    finally:
+        try:
+            worker_loop.run_until_complete(sandbox.close())
+        except Exception:
+            pass
+        try:
+            worker_loop.close()
+        except Exception:
+            pass
+    
+    # Build task list across both generators and validators
+    tasks = []  # list of tuples (folder_name, Path)
     for folder_name in ['generators', 'validators']:
         folder_path = base_dir / folder_name
 
@@ -167,38 +178,69 @@ def main():
             print(f"Folder {folder_name} does not exist, skipping...")
             continue
 
-        print(f"\n=== Processing {folder_name} ===")
+        print(f"\n=== Scanning {folder_name} ===")
 
-        # Find all JSONL files recursively under this folder
         jsonl_files = sorted(folder_path.rglob("*.jsonl"), key=lambda p: str(p))
         if not jsonl_files:
             print(f"No JSONL files found in: {folder_path}")
             continue
-
         for fpath in jsonl_files:
-            print(f"\nProcessing: {fpath.relative_to(base_dir)}")
-            rs = fpath.stem  # best-effort identifier
+            tasks.append((folder_name, fpath))
+
+    # Define per-file worker that owns its own loop and sandbox
+    def _process_file(folder_name, fpath: Path):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        sb = LocalSandbox()
+        try:
+            # best-effort readiness
+            try:
+                wait_for_sandbox(sb, loop, timeout=60, poll=1.0)
+            except Exception:
+                pass
+
+            rs = fpath.stem
             extracted, compiled, compilation_results = process_jsonl_file(
                 fpath,
                 output_dir,
                 binary_dir,
                 folder_name,
-                rs
-                , sandbox,
-                worker_loop
+                rs,
+                sb,
+                loop,
             )
+            rel = fpath.relative_to(base_dir)
+            return str(rel), extracted, compiled, compilation_results
+        finally:
+            try:
+                loop.run_until_complete(sb.close())
+            except Exception:
+                pass
+            try:
+                loop.close()
+            except Exception:
+                pass
 
-            total_extracted += extracted
-            total_compiled += compiled
-            processed_files += 1
-            all_compilation_results.extend(compilation_results)
+    # Run tasks in a thread pool
+    if tasks:
+        print(f"\n=== Running {len(tasks)} files with {args.workers} workers ===")
+        with ThreadPoolExecutor(max_workers=args.workers) as executor:
+            future_to_task = {executor.submit(_process_file, folder, path): (folder, path) for folder, path in tasks}
+            for future in as_completed(future_to_task):
+                rel, extracted, compiled, compilation_results = future.result()
+                print(f"\nProcessing: {rel}")
 
-            failed_in_file = [r for r in compilation_results if not r['success']]
-            failed_compilations.extend(failed_in_file)
+                total_extracted += extracted
+                total_compiled += compiled
+                processed_files += 1
+                all_compilation_results.extend(compilation_results)
 
-            print(f"  -> Extracted {extracted} C++ files, compiled {compiled}/{extracted} successfully")
-            if failed_in_file:
-                print(f"  -> {len(failed_in_file)} compilation failures")
+                failed_in_file = [r for r in compilation_results if not r['success']]
+                failed_compilations.extend(failed_in_file)
+
+                print(f"  -> Extracted {extracted} C++ files, compiled {compiled}/{extracted} successfully")
+                if failed_in_file:
+                    print(f"  -> {len(failed_in_file)} compilation failures")
     
     # Final summary
     print(f"\n=== FINAL SUMMARY ===")
@@ -239,7 +281,6 @@ def main():
                     print(f"     ... (and {len(error_lines)-2} more lines)")
     else:
         print("\n🎉 All files compiled successfully!")
-    """
 
 if __name__ == "__main__":
     main()
