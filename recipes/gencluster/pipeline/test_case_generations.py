@@ -76,7 +76,7 @@ if __name__ == "__main__":
         with_sandbox=True,
         get_random_port=True,
         keep_mounts_for_sandbox=True,
-        run_after=[expname+"_generators", expname+"_validators"],
+       # run_after=[expname+"_generators", expname+"_validators"],
         exclusive=True,
         time_min="04:00:00",
     )
