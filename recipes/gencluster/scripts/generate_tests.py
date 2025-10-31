@@ -349,7 +349,7 @@ def generate_datasets_for_problem(problem_dir, binary_dir, output_dir, n_dataset
             # Loop continues topping up and processing
 
     if saved_count < n_datasets:
-        print(f"⚠️  Warning: Only generated {saved_count}/{n_datasets} datasets after {max_attempts} attempts")
+        print(f"⚠️  Warning: Only generated {saved_count}/{n_datasets} datasets after {max_attempts} attempts, len(active_gens): {len(active_gens)}")
     
     return saved_count, generated_datasets
 
