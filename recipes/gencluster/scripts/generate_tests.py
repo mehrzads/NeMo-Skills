@@ -308,7 +308,7 @@ def generate_datasets_for_problem(problem_dir, binary_dir, output_dir, n_dataset
             }
         else:
             print(f"  ❌ Validation failed: only {passed_count}/{total_validators} validators passed")
-            print(f"  ⛔ Dropping generator {gen_path.name} due to failed validation")
+            print(f"  ⛔ Dropping generator {gen_path.name} due to failed validation, validation_results: {validation_results}")
             with lock:
                 active_gens = [g for g in active_gens if g != gen_path]
             # Cleanup sandbox temp file
