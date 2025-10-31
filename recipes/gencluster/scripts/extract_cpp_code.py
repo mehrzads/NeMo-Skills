@@ -71,32 +71,48 @@ def process_jsonl_file(jsonl_path, output_dir, binary_dir, folder_name, source_i
                     pid = str(data.get('id', '')).strip()
                     
                     if generation and pid:
-                        # Extract C++ code
+                        # Ensure per-problem directories exist using per-line id
+                        problem_dir = output_dir / f"problem_{pid}"
+                        problem_type_dir = problem_dir / split_dir
+                        problem_type_dir.mkdir(parents=True, exist_ok=True)
+
+                        binary_problem_dir = binary_dir / f"problem_{pid}"
+                        binary_type_dir = binary_problem_dir / split_dir
+                        binary_type_dir.mkdir(parents=True, exist_ok=True)
+
+                        # Create organized filename including source to avoid collisions across rs0/rs1
+                        output_filename = f"{source_id}_line_{line_num}.cpp"
+                        output_path = problem_type_dir / output_filename
+                        binary_exe_path = binary_type_dir / Path(output_filename).stem
+
+                        # Extract C++ code only if file doesn't already exist
                         cpp_code = extract_final_cpp_block(generation)
-                        
-                        if cpp_code.strip():  # Only save if there's actual code
-                            # Ensure per-problem directories exist using per-line id
-                            problem_dir = output_dir / f"problem_{pid}"
-                            problem_type_dir = problem_dir / split_dir
-                            problem_type_dir.mkdir(parents=True, exist_ok=True)
+                        relative_path = f"problem_{pid}/{split_dir}/{output_filename}"
 
-                            binary_problem_dir = binary_dir / f"problem_{pid}"
-                            binary_type_dir = binary_problem_dir / split_dir
-                            binary_type_dir.mkdir(parents=True, exist_ok=True)
+                        if output_path.exists():
+                            print(f"Skip extract (exists): {relative_path}")
+                        else:
+                            if cpp_code.strip():
+                                with open(output_path, 'w', encoding='utf-8') as cpp_file:
+                                    cpp_file.write(cpp_code.strip())
+                                extracted_count += 1
+                                print(f"Extracted C++ code to: {relative_path}")
+                            else:
+                                # No code and nothing to extract; skip compilation as well
+                                print(f"No code found for: {relative_path}, skipping")
+                                continue
 
-                            # Create organized filename including source to avoid collisions across rs0/rs1
-                            output_filename = f"{source_id}_line_{line_num}.cpp"
-                            output_path = problem_type_dir / output_filename
-                            
-                            # Save the C++ code
-                            with open(output_path, 'w', encoding='utf-8') as cpp_file:
-                                cpp_file.write(cpp_code.strip())
-                            
-                            extracted_count += 1
-                            relative_path = f"problem_{pid}/{split_dir}/{output_filename}"
-                            print(f"Extracted C++ code to: {relative_path}")
-                            
-                            # Compile the C++ file
+                        # Compile only if binary does not already exist
+                        if binary_exe_path.exists():
+                            compilation_results.append({
+                                'file': relative_path,
+                                'success': True,
+                                'status': 'Skipped (binary exists)',
+                                'error': ''
+                            })
+                            compiled_count += 1
+                            print(f"  ✓ Skip compile (exists)")
+                        else:
                             success, status, error_msg = compile_cpp_file(output_path, binary_type_dir, sandbox, loop)
                             compilation_results.append({
                                 'file': relative_path,
