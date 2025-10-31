@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
 import os
+import asyncio
 import re
 import json
-import subprocess
 import argparse
 from pathlib import Path
+from nemo_skills.code_execution.sandbox import LocalSandbox
 
 def extract_final_cpp_block(text):
     """Extract the final C++ code block from text using the provided pattern"""
@@ -13,38 +14,46 @@ def extract_final_cpp_block(text):
     matches = re.findall(pattern, text, re.DOTALL)
     return matches[-1] if matches else ""
 
-def compile_cpp_file(cpp_file_path, binary_dir):
-    """Compile a C++ file and return compilation status"""
+def wait_for_sandbox(sandbox, loop, timeout: int = 240, poll: float = 1.0):
+    deadline = asyncio.get_event_loop_policy().time() + timeout
+    while asyncio.get_event_loop_policy().time() < deadline:
+        try:
+            result, _ = loop.run_until_complete(sandbox.execute_code("echo hello world", language="shell", timeout=10))
+            if result.get("stdout", "").strip() == "hello world":
+                return
+        except Exception:
+            pass
+        # simple sleep
+        loop.run_until_complete(asyncio.sleep(poll))
+    raise RuntimeError(f"Sandbox not ready after waiting {timeout}s")
+
+def compile_cpp_file(cpp_file_path, binary_dir, sandbox, loop):
+    """Compile a C++ file inside the sandbox and return compilation status"""
     cpp_file = Path(cpp_file_path)
-    binary_name = cpp_file.stem  # filename without extension
+    binary_dir = Path(binary_dir)
+    binary_name = cpp_file.stem
     binary_path = binary_dir / binary_name
-    
-    # Compilation command with optimization and warnings
-    compile_cmd = [
-        'g++', '-std=c++17', '-O2', '-Wall', '-Wextra',
-        '-o', str(binary_path), str(cpp_file)
-    ]
-    
+
+    # Ensure binary directory exists
+    mkdir_cmd = f"mkdir -p {binary_dir}"
+    loop.run_until_complete(sandbox.execute_code(mkdir_cmd, language="shell", timeout=30))
+
+    # Compile using gnu++17 similar to evaluators
+    compile_cmd = (
+        f"g++ -std=gnu++17 -O2 -pipe -s -o {binary_path} {cpp_file}"
+    )
     try:
-        # Run compilation
-        result = subprocess.run(
-            compile_cmd, 
-            capture_output=True, 
-            text=True, 
-            timeout=30  # 30 second timeout
+        result, _ = loop.run_until_complete(
+            sandbox.execute_code(compile_cmd, language="shell", timeout=120)
         )
-        
-        if result.returncode == 0:
-            return True, "Success", ""
-        else:
-            return False, "Compilation failed", result.stderr
-            
-    except subprocess.TimeoutExpired:
-        return False, "Timeout", "Compilation timed out after 30 seconds"
+        stderr = result.get("stderr", "")
+        if stderr.strip():
+            return False, "Compilation failed", stderr
+        return True, "Success", ""
     except Exception as e:
         return False, "Error", str(e)
 
-def process_jsonl_file(jsonl_path, output_dir, binary_dir, folder_name, source_id):
+def process_jsonl_file(jsonl_path, output_dir, binary_dir, folder_name, source_id, sandbox, loop):
     """Process a single JSONL file; use per-line 'id' to organize outputs."""
     extracted_count = 0
     compiled_count = 0
@@ -87,7 +96,7 @@ def process_jsonl_file(jsonl_path, output_dir, binary_dir, folder_name, source_i
                             print(f"Extracted C++ code to: {relative_path}")
                             
                             # Compile the C++ file
-                            success, status, error_msg = compile_cpp_file(output_path, binary_type_dir)
+                            success, status, error_msg = compile_cpp_file(output_path, binary_type_dir, sandbox, loop)
                             compilation_results.append({
                                 'file': relative_path,
                                 'success': success,
@@ -135,14 +144,21 @@ def main():
     all_compilation_results = []
     failed_compilations = []
     
-    # Check if g++ is available
+    # Initialize sandbox and verify compiler availability inside sandbox
+    worker_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(worker_loop)
+    sandbox = LocalSandbox()
+    wait_for_sandbox(sandbox, worker_loop)
     try:
-        subprocess.run(['g++', '--version'], capture_output=True, check=True)
-        print("✓ g++ compiler found")
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        print("✗ g++ compiler not found! Please install g++ to enable compilation.")
+        result, _ = worker_loop.run_until_complete(sandbox.execute_code('g++ --version', language='shell', timeout=30))
+        if result.get('stderr', '').strip():
+            print("✗ g++ not available inside sandbox")
+            return
+        print("✓ g++ compiler found in sandbox")
+    except Exception:
+        print("✗ Failed to verify g++ inside sandbox")
         return
-    
+    """
     # Process both generators and validators folders
     for folder_name in ['generators', 'validators']:
         folder_path = base_dir / folder_name
@@ -168,6 +184,8 @@ def main():
                 binary_dir,
                 folder_name,
                 rs
+                , sandbox,
+                worker_loop
             )
 
             total_extracted += extracted
@@ -221,6 +239,7 @@ def main():
                     print(f"     ... (and {len(error_lines)-2} more lines)")
     else:
         print("\n🎉 All files compiled successfully!")
+    """
 
 if __name__ == "__main__":
     main()

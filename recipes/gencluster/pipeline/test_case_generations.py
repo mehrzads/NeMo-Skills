@@ -14,7 +14,7 @@ if __name__ == "__main__":
     server_gpus = 8
     server_nodes = 1
     server_args = "--async-scheduling --max-num-seqs=1024"
-    num_runs = 100
+    num_runs = 10
     generate(
         ctx=wrap_arguments(
             "++skip_filled=True "
@@ -63,7 +63,8 @@ if __name__ == "__main__":
         with_sandbox=True,
     )
 
-    genrate_tests_command = f"python /nemo_run/code/recipes/gencluster/scripts/extract_cpp_code.py --input_dir {output_dir} ; python /nemo_run/code/recipes/gencluster/scripts/generate_tests.py 100 --min-validators 75 --base-dir {output_dir}"
+    genrate_tests_command = f"python /nemo_run/code/recipes/gencluster/scripts/extract_cpp_code.py --input_dir {output_dir} ;"
+    # python /nemo_run/code/recipes/gencluster/scripts/generate_tests.py 10 --min-validators 75 --base-dir {output_dir}
     run_cmd(
         ctx=wrap_arguments(""), 
         cluster=cluster,
@@ -74,6 +75,7 @@ if __name__ == "__main__":
         num_gpus=0,
         with_sandbox=True,
         get_random_port=True,
+        keep_mounts_for_sandbox=True,
         run_after=[expname+"_generators", expname+"_validators"],
         exclusive=True,
         time_min="04:00:00",
