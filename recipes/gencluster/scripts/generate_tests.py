@@ -210,13 +210,31 @@ def generate_datasets_for_problem(problem_dir, binary_dir, output_dir, n_dataset
     
     # Parallel generation across generators with coordination
     generated_datasets = []
-    saved_count = 0
-    next_index = 1
+    # Detect already saved datasets and pick up numbering
+    existing_indices = []
+    try:
+        for p in problem_output_dir.iterdir():
+            if p.is_file() and p.name.startswith('dataset_') and p.suffix == '.txt':
+                try:
+                    idx_part = p.stem.split('_', 1)[1]
+                    existing_indices.append(int(idx_part))
+                except Exception:
+                    continue
+    except FileNotFoundError:
+        pass
+    existing_indices.sort()
+    saved_count = len(existing_indices)
+    next_index = (existing_indices[-1] + 1) if existing_indices else 1
+    remaining_needed = max(0, n_datasets - saved_count)
     attempts = 0
-    max_attempts = n_datasets * 10  # Safety limit
+    max_attempts = max(1, remaining_needed * 10)  # Safety limit based on remaining
     lock = threading.Lock()
 
     active_gens = list(gen_binaries)
+
+    if saved_count >= n_datasets:
+        print(f"  ✅ Already have {saved_count}/{n_datasets} datasets – skipping generation for this problem")
+        return saved_count, generated_datasets
 
     def attempt_generation(gen_path):
         nonlocal attempts, saved_count, next_index, active_gens

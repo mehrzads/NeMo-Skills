@@ -19,11 +19,7 @@ def collect_datasets(root_dir: Path):
 
     subdirs = sorted([p for p in root_dir.iterdir() if p.is_dir() and p.name.isdigit()], key=sort_key)
     
-    # Create mapping to fill gaps - map existing directories to continuous sequence 1-39
-    if len(subdirs) != 39:
-        print(f"Warning: Found {len(subdirs)} directories, but expected 39")
-        print(f"Existing directories: {[d.name for d in subdirs]}")
-    
+   
     # Create mapping from existing directory numbers to sequential 1-39
     directory_mapping = {}
     for i, subdir in enumerate(subdirs, 1):
@@ -36,12 +32,7 @@ def collect_datasets(root_dir: Path):
         
         # Collect .txt files only, sorted lexicographically to keep a stable order
         txt_files = sorted([p for p in subdir.iterdir() if p.is_file() and p.suffix.lower() == ".txt"])
-        if len(txt_files) > 25:
-            txt_files = txt_files[:25]
-        if len(txt_files) != 25:
-            raise ValueError(
-                f"Directory '{original_name}' (mapped to {mapped_name}) contains {len(txt_files)} .txt files; expected exactly 100."
-            )
+       
         # Track counts for reporting later
         folder_counts.append((original_name, len(txt_files)))
 
