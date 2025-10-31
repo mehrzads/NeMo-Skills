@@ -8,6 +8,7 @@ import argparse
 from pathlib import Path
 from nemo_skills.code_execution.sandbox import LocalSandbox
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 
 def extract_final_cpp_block(text):
     """Extract the final C++ code block from text using the provided pattern"""
@@ -139,6 +140,7 @@ def main():
     binary_dir.mkdir(exist_ok=True)
     
     # Statistics tracking
+    start_time = time.time()
     total_extracted = 0
     total_compiled = 0
     processed_files = 0
@@ -281,6 +283,13 @@ def main():
                     print(f"     ... (and {len(error_lines)-2} more lines)")
     else:
         print("\n🎉 All files compiled successfully!")
+
+    # Runtime summary
+    elapsed = time.time() - start_time
+    mm, ss = divmod(int(elapsed), 60)
+    hh, mm = divmod(mm, 60)
+    human = (f"{hh}h {mm}m {ss}s" if hh else f"{mm}m {ss}s") if mm or hh else f"{int(elapsed)}s"
+    print(f"\nTime spent: {human} ({elapsed:.1f}s)")
 
 if __name__ == "__main__":
     main()
