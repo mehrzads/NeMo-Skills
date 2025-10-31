@@ -15,8 +15,8 @@ def extract_final_cpp_block(text):
     return matches[-1] if matches else ""
 
 def wait_for_sandbox(sandbox, loop, timeout: int = 240, poll: float = 1.0):
-    deadline = asyncio.get_event_loop_policy().time() + timeout
-    while asyncio.get_event_loop_policy().time() < deadline:
+    deadline = loop.time() + timeout
+    while loop.time() < deadline:
         try:
             result, _ = loop.run_until_complete(sandbox.execute_code("echo hello world", language="shell", timeout=10))
             if result.get("stdout", "").strip() == "hello world":
