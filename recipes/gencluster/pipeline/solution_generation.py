@@ -16,6 +16,7 @@ eval(
         ),
         cluster="iad",
         with_sandbox=True,
+        keep_mounts_for_sandbox=True,
         expname=f"icpc_eval_run",
         model=f"/hf_models/gpt-oss-120b",
         server_type='vllm',
