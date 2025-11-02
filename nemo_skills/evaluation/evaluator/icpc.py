@@ -415,7 +415,8 @@ class ICPCEvaluator(BaseEvaluator):
 
         test_case_results = { "sample_score": problem_state["sample_passed"],  "score": problem_state["test_passed"], "outputs": problem_state["outputs"]}
         if self.inputdata is not None:
-            problem_inputs = self.inputdata[entry["id"]]
+            print(f"ID: {entry['id']}")
+            problem_inputs = self.inputdata["1"]
             print(f"Problem inputs: {problem_inputs}")
 
         return {"name": entry["name"], "test_case_results": test_case_results}
