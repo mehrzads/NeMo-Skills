@@ -12,8 +12,8 @@ eval(
             "++inference.tokens_to_generate=120000 " 
             "++inference.extra_body.reasoning_effort=high "
             "++max_concurrent_requests=1024 "
-            "++eval_config.test_file=/workspace/llmcoding/eval_dataset/icpc25/test_metadata.json"
-            "++eval_config.input_file=/workspace/gpt-oss-120b/gencluster/gpt-oss-120b_100.json"
+            "++eval_config.test_file=/workspace/llmcoding/eval_dataset/icpc25/test_metadata.json "
+            "++eval_config.input_file=/workspace/gpt-oss-120b/gencluster/gpt-oss-120b_100.json "
         ),
         cluster="iad",
         with_sandbox=True,
