@@ -18,7 +18,7 @@ import os
 import re
 import threading
 import time
-from typing import Dict
+from typing import Any, Dict
 import shutil
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
@@ -358,7 +358,8 @@ class ICPCEvaluator(BaseEvaluator):
         pre_dir = self.precompiled_cache[pid]
 
         problem_state = {
-            "outputs": [],
+            "test_outputs": [],
+            "input_outputs": [],
             "scores": [],
             "sample_passed": True,
             "test_passed": True,
@@ -396,7 +397,7 @@ class ICPCEvaluator(BaseEvaluator):
             for (test_name, _, test_type), result in zip(batch, results):
                 result["test_name"] = test_name
                 result["test_type"] = test_type
-                problem_state["outputs"].append(result)
+                problem_state["test_outputs"].append(result)
                 problem_state["scores"].append(float(result.get("score", 0)))
                 if test_type == "sample":
                     if float(result.get("score", 0)) == 0.0:
@@ -413,7 +414,7 @@ class ICPCEvaluator(BaseEvaluator):
                         f"--- STDERR ---\n{result.get('compile_stderr', '').strip()}\n"
                     )
 
-        test_case_results = { "sample_score": problem_state["sample_passed"],  "score": problem_state["test_passed"], "outputs": problem_state["outputs"]}
+        test_case_results = { "sample_score": problem_state["sample_passed"],  "score": problem_state["test_passed"], "outputs": problem_state["test_outputs"]}
         if self.inputdata is not None:
             problem_inputs = self.inputdata[str(entry['id'])]
             print(f"Problem inputs: {len(problem_inputs)}")
@@ -430,9 +431,22 @@ class ICPCEvaluator(BaseEvaluator):
                             "test_input": test_data["content"],
                         }
                     )
+                # map with unique worker id argument
+                results = await asyncio.to_thread(
+                    self.pool.starmap, run_input_case, [(ta, idx) for idx, ta in enumerate(tasks)]
+                )
+
+            for test_data, result in zip(batch, results):
+                test_name = test_data["file_name"]
+                test_type = "input"
+                result["test_name"] = test_name
+                result["test_type"] = test_type
+                problem_state["input_outputs"].append(result)
+
+               
 
 
-        return {"name": entry["name"], "test_case_results": test_case_results}
+        return {"name": entry["name"], "test_case_results": test_case_results, "input_case_results": problem_state["input_outputs"]}
 
     async def eval_full(self, input_files):  # type: ignore[override]
         for jsonl_file in unroll_files(input_files):
@@ -444,6 +458,7 @@ class ICPCEvaluator(BaseEvaluator):
 
             for s, o in zip(all_samples, outputs):
                 s["test_case_results"] = o["test_case_results"]
+                s["input_case_results"] = o["input_case_results"]
                 s["eval_status"] = o["eval_status"]
 
             jdump(all_samples, jsonl_file, mode="wt")
