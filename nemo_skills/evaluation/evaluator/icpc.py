@@ -30,6 +30,7 @@ from nemo_skills.utils import nested_dataclass, unroll_files
 @nested_dataclass(kw_only=True)
 class ICPCEvaluatorConfig(BaseEvaluatorConfig):
     test_file: str = "test_metadata.json"
+    input_file: str = None
     num_workers: int = 16  # number of test workers
     test_batch_size: int = 16  # number of tests to run concurrently
     overwrite: bool = False
@@ -58,18 +59,6 @@ def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shel
     return loop.run_until_complete(sandbox.execute_code(cmd, language=language, timeout=timeout))[0]
 
 
-def wait_for_sandbox(sandbox, timeout: int = 240, poll: float = 1.0):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        try:
-            resp = _sandbox_exec_sync(sandbox, "echo hello world", language="shell", timeout=10)
-            if resp.get("stdout", "").strip() == "hello world":
-                return
-        except Exception:
-            pass
-        time.sleep(poll)
-    raise RuntimeError(f"Sandbox not ready after waiting {timeout}s")
-
 
 def init_worker():
     """Per-process initializer: set up an event loop for httpx/asyncio calls."""
@@ -80,13 +69,12 @@ def init_worker():
 
 
 def _precompile_grader(
-    problem_name: str, grader_files, compile_code: str, run_code: str, sandbox: LocalSandbox
+    problem_name: str, grader_files, compile_code: str, run_code: str, user_run_code: str, sandbox: LocalSandbox
 ) -> str:
     """Precompile checker/grader for a problem once and return the directory path."""
     # Ensure sandbox belongs to this thread; if not, create a local one.
     if getattr(sandbox, "_owner_tid", None) != threading.get_ident():
         sandbox = LocalSandbox()
-        wait_for_sandbox(sandbox)
         sandbox._owner_tid = threading.get_ident()
 
     pre_dir = f"/tmp/icpc_pre_{problem_name}_{os.getpid()}"
@@ -112,6 +100,11 @@ def _precompile_grader(
     with open(run_path, "w", encoding="utf-8") as f:
         f.write(run_code)
     os.chmod(run_path, 0o755)
+
+    user_run_path = os.path.join(pre_dir, "user_run.sh")
+    with open(user_run_path, "w", encoding="utf-8") as f:
+        f.write(user_run_code)
+    os.chmod(user_run_path, 0o755)
 
     # Run compile.sh inside the sandbox (same filesystem)
     _sandbox_exec_sync(sandbox, f"cd {pre_dir} && ./compile.sh || true", language="shell", timeout=120)
@@ -194,6 +187,78 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         except Exception:
             pass
 
+def run_input_case(task_args: dict, worker_id: int) -> dict:
+    # Use high-resolution timestamp to guarantee uniqueness across parallel calls.
+    unique_dir = f"/tmp/icpc_run_{worker_id}_{os.getpid()}_{time.time_ns()}"
+
+    try:
+        # 1. Create all necessary files locally (sandbox shares filesystem)
+        precompiled_dir = task_args.get("precompiled_dir")
+        os.makedirs(unique_dir, exist_ok=True)
+        os.makedirs(os.path.join(unique_dir, "graders"), exist_ok=True)
+        # Copy precompiled assets into unique run directory
+        if precompiled_dir and os.path.isdir(precompiled_dir):
+            shutil.copytree(precompiled_dir, unique_dir, dirs_exist_ok=True)
+        # Write contestant solution
+        with open(os.path.join(unique_dir, "graders", f"{task_args['problem_id']}.cpp"), "w", encoding="utf-8") as f:
+            f.write(task_args["generated_code"])
+        # Write input and expected output files
+        with open(os.path.join(unique_dir, "input.txt"), "w", encoding="utf-8") as f:
+            f.write(task_args["test_input"])        
+        # 2. Compile only the problem solution (skip checker/grader recompilation)
+        # Compile the solution together with optional grader/stub sources without
+        # recompiling the checker/manager again.
+        compile_command = f"cd {unique_dir} && ./compile.sh"
+        sandbox = LocalSandbox()
+        compile_result, _ = worker_loop.run_until_complete(
+            sandbox.execute_code(compile_command, language="shell", timeout=120)
+        )
+
+        result = {
+            "compile_success": not compile_result.get("stderr"),
+            "compile_stdout": compile_result.get("stdout", ""),
+            "compile_stderr": compile_result.get("stderr", ""),
+            "run_stdout": "",
+            "run_stderr": "",
+            "error": "",
+            "score": 0.0,
+        }
+
+        if not result["compile_success"]:
+            return result
+
+        # 3. Run the code
+        run_command = f"cd {unique_dir} && ./user_run.sh"
+        run_result, _ = worker_loop.run_until_complete(
+            sandbox.execute_code(run_command, language="shell", timeout=120, max_output_characters=1000000)
+        )
+
+        run_stdout = run_result.get("stdout", "")
+        run_stderr = run_result.get("stderr", "")
+
+        result.update(
+            {
+                "run_stdout": run_stdout,
+                "run_stderr": run_stderr,
+            }
+        )
+
+        try:
+            result["score"] = float(result["run_stdout"].strip())
+        except (ValueError, TypeError):
+            result["score"] = 0.0
+
+        return result
+
+    except Exception as e:
+        return {"score": 0.0, "output": "", "error": str(e)}
+
+    finally:
+        # 4. Clean up the directory locally
+        try:
+            shutil.rmtree(unique_dir, ignore_errors=True)
+        except Exception:
+            pass
 
 def extract_final_cpp_block(text):
     pattern = r"```(?:cpp|Cpp)\s*\n(.*?)```"
@@ -236,7 +301,6 @@ class ICPCEvaluator(BaseEvaluator):
         # Run blocking setup in a background thread to avoid nested event‐loop issues.
         def _setup():
             sbox = LocalSandbox()
-            wait_for_sandbox(sbox)
             # Remember the thread id that owns this sandbox instance.
             sbox._owner_tid = threading.get_ident()
 
@@ -248,14 +312,23 @@ class ICPCEvaluator(BaseEvaluator):
                 )
             with open(self.eval_cfg.test_file, "r") as f:
                 metadata_local = json.load(f)
+            input_local = None
+            if self.eval_cfg.input_file:
+                if not os.path.exists(self.eval_cfg.input_file):
+                    raise FileNotFoundError(
+                        f"Input file {self.eval_cfg.input_file} does not exist."
+                        " Please provide a valid parameter for ++eval_config.input_file=x when running ICPC Evaluation."
+                    )
+                with open(self.eval_cfg.input_file, "r") as f:
+                    input_local = json.load(f)
             pool_local = multiprocessing.Pool(
                 processes=self.eval_cfg.test_batch_size,
                 initializer=init_worker,
             )
 
-            return sbox, metadata_local, pool_local
+            return sbox, metadata_local, input_local, pool_local
 
-        self.sandbox, self.metadata, self.pool = await asyncio.to_thread(_setup)
+        self.sandbox, self.metadata, self.inputdata, self.pool = await asyncio.to_thread(_setup)
 
     # Internal helper
     async def _evaluate_entry(self, entry: dict) -> dict:
@@ -269,6 +342,7 @@ class ICPCEvaluator(BaseEvaluator):
         problem_metadata = self.metadata[entry["icpc_id"]]
         compile_code = problem_metadata["compile"]
         run_code = problem_metadata["run"]
+        user_run_code = problem_metadata["user_run"]
         grader_files = problem_metadata["grader_files"]
 
         if pid not in self.precompiled_cache:
@@ -278,6 +352,7 @@ class ICPCEvaluator(BaseEvaluator):
                 grader_files,
                 compile_code,
                 run_code,
+                user_run_code,
                 self.sandbox,
             )
         pre_dir = self.precompiled_cache[pid]
@@ -339,6 +414,10 @@ class ICPCEvaluator(BaseEvaluator):
                     )
 
         test_case_results = { "sample_score": problem_state["sample_passed"],  "score": problem_state["test_passed"], "outputs": problem_state["outputs"]}
+        if self.inputdata is not None:
+            problem_inputs = self.inputdata[entry["id"]]
+            print(f"Problem inputs: {problem_inputs}")
+
         return {"name": entry["name"], "test_case_results": test_case_results}
 
     async def eval_full(self, input_files):  # type: ignore[override]
