@@ -416,21 +416,18 @@ class ICPCEvaluator(BaseEvaluator):
         test_case_results = { "sample_score": problem_state["sample_passed"],  "score": problem_state["test_passed"], "outputs": problem_state["outputs"]}
         if self.inputdata is not None:
             problem_inputs = self.inputdata[str(entry['id'])]
-            all_tests =  [(t["file_name"], t["content"], "input") for t in problem_inputs.items()]
-            print(f"Problem inputs: {len(all_tests)}")
-            for i in range(0, len(all_tests), batch_size):
-                batch = all_tests[i : i + batch_size]
-
+            print(f"Problem inputs: {len(problem_inputs)}")
+            for i in range(0, len(problem_inputs), batch_size):
+                batch = problem_inputs[i : i + batch_size]
                 tasks = []
                 for test_data in batch:
-                    test_name, test_data, test_type = test_data
-                    print(f"Test Name: {test_name}")
+                    print(f"Test Name: {test_data['file_name']}")
                     tasks.append(
                         {
                             "generated_code": completion,
                             "problem_id": pid,
                             "precompiled_dir": pre_dir,
-                            "test_input": test_data,
+                            "test_input": test_data["content"],
                         }
                     )
 
