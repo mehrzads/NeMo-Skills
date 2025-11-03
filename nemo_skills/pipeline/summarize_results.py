@@ -25,6 +25,7 @@ from typing import Optional
 import typer
 
 from nemo_skills.dataset.utils import ExtraDatasetType
+from nemo_skills.pipeline.utils import parse_extra_metrics_arguments
 from nemo_skills.evaluation.metrics import ComputeMetrics, default_formatting
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
@@ -192,10 +193,15 @@ def summarize_results(
         "nemo-skills",
         help="Name of the wandb project to sync results to.",
     ),
+   extra_metrics_arguments: str = typer.Option(
+        "",
+        help="Additional arguments to pass to the metrics calculator. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+    ),
 ):
     """Summarize results of an evaluation job."""
     setup_logging(disable_hydra_logs=False, log_level=logging.WARNING if not debug else logging.DEBUG)
 
+    extra_metrics_arguments = parse_extra_metrics_arguments(extra_metrics_arguments)
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")
 
@@ -282,7 +288,7 @@ def summarize_results(
             continue
 
         if metric_type is not None:
-            metrics_calculator = ComputeMetrics(benchmark, metric_type=metric_type, max_samples=max_samples)
+            metrics_calculator = ComputeMetrics(benchmark, metric_type=metric_type, max_samples=max_samples, extra_metrics_arguments=extra_metrics_arguments)
         else:
             metrics_calculator = ComputeMetrics(
                 benchmark,
@@ -292,6 +298,7 @@ def summarize_results(
                 extra_datasets_type=extra_datasets_type,
                 max_samples=max_samples,
                 max_seq_len=max_seq_len,
+                extra_metrics_arguments=extra_metrics_arguments,
             )
 
         metrics = {}
