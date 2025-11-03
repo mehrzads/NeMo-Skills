@@ -442,12 +442,12 @@ class ICPCEvaluator(BaseEvaluator):
                     self.pool.starmap, run_input_case, [(ta, idx) for idx, ta in enumerate(tasks)]
                 )
 
-            for test_data, result in zip(batch, results):
-                test_name = test_data["file_name"]
-                test_type = "input"
-                result["test_name"] = test_name
-                result["test_type"] = test_type
-                problem_state["input_outputs"].append(result)
+                for test_data, result in zip(batch, results):
+                    test_name = test_data["file_name"]
+                    test_type = "input"
+                    result["test_name"] = test_name
+                    result["test_type"] = test_type
+                    problem_state["input_outputs"].append(result)
 
         return {
             "name": entry["name"],
