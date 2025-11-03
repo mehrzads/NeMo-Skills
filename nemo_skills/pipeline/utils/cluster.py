@@ -106,7 +106,7 @@ def get_timeout_str(cluster_config, partition, with_save_delay: bool = True) -> 
     return timeout_str
 
 def parse_extra_metrics_arguments(extra_metrics_arguments: str | dict | None) -> dict | None:
-   """
+    """
     Parse extra metrics arguments from either a JSON string or a dictionary.  
 
     This utility function handles extra metrics arguments that can be provided in two ways:
