@@ -41,6 +41,22 @@ class ICPCMetrics(BaseMetrics):
         for submission in submissions:
             scores.append(submission["test_case_results"]["sample_score"])
         return scores
+    def extract_info(self, submission) -> dict:
+        return {
+            "score": submission["test_case_results"]["score"],
+            "sample_score": submission["test_case_results"]["sample_score"],
+        }
+    def get_clusters(self, submissions) -> dict:
+        clusters = defaultdict(list)        
+        for submission in submissions:
+            outputs = submission["input_case_results"]
+            run_outputs = []
+            for output in outputs:
+                run_outputs.append(output["run_stdout"])
+            output_key = tuple(run_outputs)
+            extract_info = self.extract_info(submission)
+            clusters[output_key].append(extract_info)                        
+        return clusters
 
     def get_metrics(self):
         self.problem_scores = {}
@@ -56,6 +72,8 @@ class ICPCMetrics(BaseMetrics):
                 self.correct_sample_submissions[name] = 0
             if self.problem_scores.get(name) is None:
                 self.problem_scores[name] = False
+            clusters = self.get_clusters(submission)
+            print(f"Number of clusters: {len(clusters)}")
             scores = self.get_problem_score(submission)
             sample_scores = self.get_problem_sample_score(submission)
             self.correct_submissions[name] += sum(1 for value in scores if value)
