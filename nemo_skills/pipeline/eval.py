@@ -487,8 +487,8 @@ def eval(
                 if data_dir:
                     command += f" --data_dir={data_dir} "
                 if extra_metrics_arguments:
-                    command += f" --extra_metrics_arguments={extra_metrics_arguments} "
-                print(f"Command: {command}")
+                    command += f" --extra_metrics_arguments='{extra_metrics_arguments}' "
+                
                 if benchmark in benchmark_to_judge_tasks:
                     dependent_tasks = benchmark_to_judge_tasks[benchmark]
                 else:
