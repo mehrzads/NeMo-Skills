@@ -22,10 +22,10 @@ eval(
         model=f"/hf_models/gpt-oss-120b",
         server_type='vllm',
         server_gpus=8,
-        num_jobs=1,
-        benchmarks="icpc25:1",
+        num_jobs=100,
+        benchmarks="icpc25:1000",
         data_dir="/workspace/llmcoding/eval_dataset/",
-        output_dir="/workspace/gpt-oss-120b/generation/icpc25_1/",
+        output_dir="/workspace/gpt-oss-120b/generation/run_1_icpc25_1000/",
         split="test",
         time_min="04:00:00",
         )
