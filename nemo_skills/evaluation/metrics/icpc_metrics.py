@@ -22,7 +22,7 @@ class ICPCMetrics(BaseMetrics):
         self.reset()
         self.cluster_size = cluster_size
         print(f"Cluster size: {self.cluster_size}")
-        
+
     def update(self, predictions):
         super().update(predictions)
         #        self._compute_pass_at_k(predictions)
@@ -61,7 +61,6 @@ class ICPCMetrics(BaseMetrics):
         return clusters
 
     def get_metrics(self):        
-        print(f"Cluster size: {self.cluster_size}")
         self.problem_scores = {}
         self.correct_submissions = {}
         self.total_submissions = {}
