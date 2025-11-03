@@ -17,10 +17,12 @@ from nemo_skills.evaluation.metrics.base import BaseMetrics, as_float, as_int
 
 
 class ICPCMetrics(BaseMetrics):
-    def __init__(self):
+    def __init__(self, cluster_size=7):
         super().__init__()
         self.reset()
-
+        self.cluster_size = cluster_size
+        print(f"Cluster size: {self.cluster_size}")
+        
     def update(self, predictions):
         super().update(predictions)
         #        self._compute_pass_at_k(predictions)
@@ -58,8 +60,7 @@ class ICPCMetrics(BaseMetrics):
             clusters[output_key].append(extract_info)                        
         return clusters
 
-    def get_metrics(self, cluster_size=7):
-        self.cluster_size = cluster_size
+    def get_metrics(self):        
         print(f"Cluster size: {self.cluster_size}")
         self.problem_scores = {}
         self.correct_submissions = {}
