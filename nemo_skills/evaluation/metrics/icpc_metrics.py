@@ -14,14 +14,14 @@
 from collections import defaultdict
 
 from nemo_skills.evaluation.metrics.base import BaseMetrics, as_float, as_int
-
+import os
+import json
 
 class ICPCMetrics(BaseMetrics):
-    def __init__(self, cluster_size=7):
+    def __init__(self, cluster_folder=None):
         super().__init__()
         self.reset()
-        self.cluster_size = cluster_size
-        print(f"Cluster size: {self.cluster_size}")
+        self.cluster_folder = cluster_folder
 
     def update(self, predictions):
         super().update(predictions)
@@ -74,7 +74,32 @@ class ICPCMetrics(BaseMetrics):
                 self.correct_sample_submissions[name] = 0
             if self.problem_scores.get(name) is None:
                 self.problem_scores[name] = False
-            clusters = self.get_clusters(submission)
+            if self.cluster_folder:
+                clusters = self.get_clusters(submission)
+                # Create the cluster_folder directory if self.cluster_folder is specified and directory does not exist
+                if self.cluster_folder:
+                    os.makedirs(self.cluster_folder, exist_ok=True)
+
+                # Prepare final clustered data
+                final_clusters = {}
+                
+                # Convert tuple keys to string for JSON serialization
+                for i, (output_key, codes) in enumerate(clusters.items()):
+                    # Compute score as sum of popularity counts for each position's output
+                    score = 0                   
+                    size = len(codes)                    
+                    final_clusters[f'cluster_{i+1}'] = {
+                        "output": output_key,
+                        "score": score,
+                        "size": size,
+                        "codes": codes,
+                    }
+
+                output_file = os.path.join(self.cluster_folder, f'{name}_cluster.jsonl')
+                # Write clusters to {problem_number}_cluster.jsonl
+                with open(output_file, 'w') as f:
+                    json.dump(final_clusters, f, indent=4)
+            
             print(f"Number of clusters: {len(clusters)}")
             scores = self.get_problem_score(submission)
             sample_scores = self.get_problem_sample_score(submission)
