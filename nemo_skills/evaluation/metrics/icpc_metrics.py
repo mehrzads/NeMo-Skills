@@ -58,9 +58,8 @@ class ICPCMetrics(BaseMetrics):
             clusters[output_key].append(extract_info)                        
         return clusters
 
-    def get_metrics(self, extra_arguments=None):
-        if extra_arguments:
-            self.cluster_size = extra_arguments.get("cluster_size", None)
+    def get_metrics(self, cluster_size=7):
+        self.cluster_size = cluster_size
         print(f"Cluster size: {self.cluster_size}")
         self.problem_scores = {}
         self.correct_submissions = {}
