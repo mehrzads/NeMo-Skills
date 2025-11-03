@@ -12,31 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import hashlib
 import json
 import multiprocessing
 import os
 import re
+import shutil
 import threading
 import time
-from typing import Any, Dict
-import shutil
-import hashlib
+from typing import Dict
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
 from nemo_skills.evaluation.evaluator.base import BaseEvaluator, BaseEvaluatorConfig
 from nemo_skills.file_utils import jdump
 from nemo_skills.utils import nested_dataclass, unroll_files
 
+
 def sha256_hex(text: str) -> str:
-    return hashlib.sha256(text.encode('utf-8', errors='replace')).hexdigest()
+    return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
+
 
 @nested_dataclass(kw_only=True)
 class ICPCEvaluatorConfig(BaseEvaluatorConfig):
     test_file: str = "test_metadata.json"
     input_file: str = None
-    num_workers: int = 16  # number of test workers
     test_batch_size: int = 16  # number of tests to run concurrently
-    overwrite: bool = False
 
 
 _precompile_loop_tls = threading.local()
@@ -60,7 +60,6 @@ def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shel
 
     # Use the loop within this thread exclusively.
     return loop.run_until_complete(sandbox.execute_code(cmd, language=language, timeout=timeout))[0]
-
 
 
 def init_worker():
@@ -132,9 +131,9 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             f.write(task_args["generated_code"])
         # Write input and expected output files
         with open(os.path.join(unique_dir, "input.txt"), "w", encoding="utf-8") as f:
-            f.write(task_args["test_input"]) 
+            f.write(task_args["test_input"])
         with open(os.path.join(unique_dir, "correct_output.txt"), "w", encoding="utf-8") as f:
-            f.write(task_args["test_output"]) 
+            f.write(task_args["test_output"])
         # 2. Compile only the problem solution (skip checker/grader recompilation)
         # Compile the solution together with optional grader/stub sources without
         # recompiling the checker/manager again.
@@ -190,6 +189,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         except Exception:
             pass
 
+
 def run_input_case(task_args: dict, worker_id: int) -> dict:
     # Use high-resolution timestamp to guarantee uniqueness across parallel calls.
     unique_dir = f"/tmp/icpc_run_{worker_id}_{os.getpid()}_{time.time_ns()}"
@@ -207,7 +207,7 @@ def run_input_case(task_args: dict, worker_id: int) -> dict:
             f.write(task_args["generated_code"])
         # Write input and expected output files
         with open(os.path.join(unique_dir, "input.txt"), "w", encoding="utf-8") as f:
-            f.write(task_args["test_input"])        
+            f.write(task_args["test_input"])
         # 2. Compile only the problem solution (skip checker/grader recompilation)
         # Compile the solution together with optional grader/stub sources without
         # recompiling the checker/manager again.
@@ -262,6 +262,7 @@ def run_input_case(task_args: dict, worker_id: int) -> dict:
             shutil.rmtree(unique_dir, ignore_errors=True)
         except Exception:
             pass
+
 
 def extract_final_cpp_block(text):
     pattern = r"```(?:cpp|Cpp)\s*\n(.*?)```"
@@ -368,10 +369,8 @@ class ICPCEvaluator(BaseEvaluator):
             "test_passed": True,
         }
 
-
-        all_tests =  [(tname, t, "sample") for tname, t in problem_metadata["sample_tests"].items()]
-        all_tests =  all_tests + [(tname, t, "test") for tname, t in problem_metadata["tests"].items()]
-        
+        all_tests = [(tname, t, "sample") for tname, t in problem_metadata["sample_tests"].items()]
+        all_tests = all_tests + [(tname, t, "test") for tname, t in problem_metadata["tests"].items()]
 
         batch_size = self.eval_cfg.test_batch_size
 
@@ -417,9 +416,13 @@ class ICPCEvaluator(BaseEvaluator):
                         f"--- STDERR ---\n{result.get('compile_stderr', '').strip()}\n"
                     )
 
-        test_case_results = { "sample_score": problem_state["sample_passed"],  "score": problem_state["test_passed"], "outputs": problem_state["test_outputs"]}
+        test_case_results = {
+            "sample_score": problem_state["sample_passed"],
+            "score": problem_state["test_passed"],
+            "outputs": problem_state["test_outputs"],
+        }
         if self.inputdata is not None:
-            problem_inputs = self.inputdata[str(entry['id'])]
+            problem_inputs = self.inputdata[str(entry["id"])]
             print(f"Problem inputs: {len(problem_inputs)}")
             for i in range(0, len(problem_inputs), batch_size):
                 batch = problem_inputs[i : i + batch_size]
@@ -446,10 +449,11 @@ class ICPCEvaluator(BaseEvaluator):
                 result["test_type"] = test_type
                 problem_state["input_outputs"].append(result)
 
-               
-
-
-        return {"name": entry["name"], "test_case_results": test_case_results, "input_case_results": problem_state["input_outputs"]}
+        return {
+            "name": entry["name"],
+            "test_case_results": test_case_results,
+            "input_case_results": problem_state["input_outputs"],
+        }
 
     async def eval_full(self, input_files):  # type: ignore[override]
         for jsonl_file in unroll_files(input_files):
