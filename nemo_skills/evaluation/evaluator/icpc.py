@@ -20,12 +20,15 @@ import threading
 import time
 from typing import Any, Dict
 import shutil
+import hashlib
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
 from nemo_skills.evaluation.evaluator.base import BaseEvaluator, BaseEvaluatorConfig
 from nemo_skills.file_utils import jdump
 from nemo_skills.utils import nested_dataclass, unroll_files
 
+def sha256_hex(text: str) -> str:
+    return hashlib.sha256(text.encode('utf-8', errors='replace')).hexdigest()
 
 @nested_dataclass(kw_only=True)
 class ICPCEvaluatorConfig(BaseEvaluatorConfig):
@@ -233,7 +236,7 @@ def run_input_case(task_args: dict, worker_id: int) -> dict:
             sandbox.execute_code(run_command, language="shell", timeout=120, max_output_characters=1000000)
         )
 
-        run_stdout = run_result.get("stdout", "")
+        run_stdout = sha256_hex(run_result.get("stdout", ""))
         run_stderr = run_result.get("stderr", "")
 
         result.update(
