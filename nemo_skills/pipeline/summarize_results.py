@@ -193,7 +193,7 @@ def summarize_results(
         "nemo-skills",
         help="Name of the wandb project to sync results to.",
     ),
-   extra_metrics_arguments: str = typer.Option(
+    extra_metrics_arguments: str = typer.Option(
         "",
         help="Additional arguments to pass to the metrics calculator. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),
