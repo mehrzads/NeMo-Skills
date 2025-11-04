@@ -29,7 +29,8 @@ from nemo_skills.utils import nested_dataclass, unroll_files
 
 
 def sha256_hex(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
+    return text
+    #return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
 
 
 @nested_dataclass(kw_only=True)
