@@ -24,7 +24,7 @@ eval(
     benchmarks="icpc25:1000",
     data_dir="/workspace/llmcoding/eval_dataset/",
     output_dir="/workspace/gpt-oss-120b/generation/run_1_icpc25_1000/",
-    extra_metrics_arguments='{"cluster_folder": "/workspace/gpt-oss-120b/generation/run_1_icpc25_1000/clusters/"}',
+    metrics_kwargs='{"cluster_folder": "/workspace/gpt-oss-120b/generation/run_1_icpc25_1000/clusters/"}',
     split="test",
     time_min="04:00:00",
 )
