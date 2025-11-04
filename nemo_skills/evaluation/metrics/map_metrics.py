@@ -95,6 +95,8 @@ def get_metrics(metric_type: str, **kwargs):
         )
     # If no kwargs are provided, return the metrics class without any arguments
     if not kwargs:
+        print(f"No kwargs provided, returning metrics class without any arguments")
         return metrics_cls()
     else:
+        print(f"kwargs provided, returning metrics class with arguments: {kwargs}")
         return metrics_cls(**kwargs)
