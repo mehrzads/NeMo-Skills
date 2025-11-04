@@ -108,7 +108,7 @@ class ICPCMetrics(BaseMetrics):
             if self.problem_scores.get(name) is None:
                 self.problem_scores[name] = False
             if self.cluster_folder:
-                clusters, id , status = self.get_clusters(submission)
+                clusters, id  = self.get_clusters(submission)
                 # Create the cluster_folder directory if self.cluster_folder is specified and directory does not exist
                 if self.cluster_folder:
                     os.makedirs(self.cluster_folder, exist_ok=True)
