@@ -284,17 +284,19 @@ def generate_datasets_for_problem(
 
             dataset_filename = f"dataset_{dataset_idx:03d}.txt"
             dataset_path = problem_output_dir / dataset_filename
-            # Retrieve content from sandbox temp file to save locally
+            # Move file from sandbox temp to final location
             try:
-                cat_res, _ = loop.run_until_complete(
-                    sandbox.execute_code(f"cat {shlex.quote(sandbox_tmp_path)}", language="shell", timeout=30)
+                mv_res, _ = loop.run_until_complete(
+                    sandbox.execute_code(
+                        f"mv {shlex.quote(sandbox_tmp_path)} {shlex.quote(str(dataset_path))}", 
+                        language="shell", 
+                        timeout=30
+                    )
                 )
-                if cat_res.get("process_status") != "completed":
-                    raise RuntimeError(cat_res.get("stderr", "Failed to read sandbox file"))
-                with open(dataset_path, "w") as f:
-                    f.write(cat_res.get("stdout", ""))
+                if mv_res.get("process_status") != "completed":
+                    raise RuntimeError(mv_res.get("stderr", "Failed to move sandbox file"))
             except Exception as e:
-                print(f"  ❌ Failed to save dataset from sandbox: {e}")
+                print(f"  ❌ Failed to move dataset from sandbox: {e}")
                 try:
                     loop.run_until_complete(
                         sandbox.execute_code(f"rm -f {shlex.quote(sandbox_tmp_path)}", language="shell", timeout=5)
