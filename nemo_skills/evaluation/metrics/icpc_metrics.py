@@ -77,7 +77,7 @@ class ICPCMetrics(BaseMetrics):
                         "Test failed": 0,
                         "Sample passed": 0,
                         "Sample failed": 0,
-                    }
+                    },
                     "codes": [],
                 }
             clusters[output_key]["codes"].append(extract_info)
