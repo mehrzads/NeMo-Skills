@@ -23,10 +23,10 @@ def extract_final_cpp_block(text):
     return matches[-1] if matches else ""
 
 class ICPCMetrics(BaseMetrics):
-    def __init__(self, cluster_folder=None):
+    def __init__(self, **kwargs):
         super().__init__()
         self.reset()
-        self.cluster_folder = cluster_folder
+        self.cluster_folder = kwargs.get("cluster_folder", None)
 
     def update(self, predictions):
         super().update(predictions)
