@@ -27,6 +27,7 @@ class ICPCMetrics(BaseMetrics):
         super().__init__()
         self.reset()
         self.cluster_folder = kwargs.get("cluster_folder", None)
+        print(f"Cluster folder: {self.cluster_folder}")
 
     def update(self, predictions):
         super().update(predictions)
@@ -108,7 +109,7 @@ class ICPCMetrics(BaseMetrics):
                 with open(output_file, "w") as f:
                     json.dump(final_clusters, f, indent=4)
 
-            print(f"Number of clusters: {len(clusters)}")
+                print(f"Number of clusters: {len(clusters)}")
             scores = self.get_problem_score(submission)
             sample_scores = self.get_problem_sample_score(submission)
             self.correct_submissions[name] += sum(1 for value in scores if value)
