@@ -62,10 +62,7 @@ class ICPCMetrics(BaseMetrics):
         clusters = defaultdict(list)
         id = 0
         status = defaultdict(list)
-        status["Test passed"] = 0
-        status["Test failed"] = 0
-        status["Sample passed"] = 0
-        status["Sample failed"] = 0
+        
         for submission in submissions:
             outputs = submission["input_case_results"]
             run_outputs = []
@@ -73,17 +70,28 @@ class ICPCMetrics(BaseMetrics):
                 run_outputs.append(output["run_stdout"])
             output_key = tuple(run_outputs)
             extract_info = self.extract_info(submission)
-            clusters[output_key].append(extract_info)
+            if output_key not in clusters:
+                clusters[output_key] = {
+                    "status": {
+                        "Test passed": 0,
+                        "Test failed": 0,
+                        "Sample passed": 0,
+                        "Sample failed": 0,
+                    }
+                    "codes": [],
+                }
+            clusters[output_key]["codes"].append(extract_info)
+            
             id = submission["id"]
             if submission["test_case_results"]["score"] > 0:
-                status["Test passed"] += 1
+                clusters[output_key]["status"]["Test passed"] += 1
             else:
-                status["Test failed"] += 1
+                clusters[output_key]["status"]["Test failed"] += 1
             if submission["test_case_results"]["sample_score"] > 0:
-                status["Sample passed"] += 1
+                clusters[output_key]["status"]["Sample passed"] += 1
             else:
-                status["Sample failed"] += 1    
-        return clusters, id, status
+                clusters[output_key]["status"]["Sample failed"] += 1    
+        return clusters, id
 
     def get_metrics(self):
         self.problem_scores = {}
@@ -109,16 +117,13 @@ class ICPCMetrics(BaseMetrics):
                 final_clusters = {}
 
                 # Convert tuple keys to string for JSON serialization
-                for i, (output_key, codes) in enumerate(clusters.items()):
-                    # Compute score as sum of popularity counts for each position's output
-                    score = 0
-                    size = len(codes)
+                for i, (output_key, cluster) in enumerate(clusters.items()):
+                    # Compute score as sum of popularity counts for each position's output                     
                     final_clusters[f"cluster_{i + 1}"] = {
-                        "output": output_key,
-                        "score": score,
-                        "size": size,
-                        "codes": codes,
-                        "status": status,
+                        "output": output_key,                        
+                        "status": cluster["status"],
+                        "codes": cluster["codes"],
+                        
                     }
 
                 output_file = os.path.join(self.cluster_folder, f"{id}_cluster.jsonl")
