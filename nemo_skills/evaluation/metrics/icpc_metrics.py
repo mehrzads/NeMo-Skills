@@ -60,6 +60,12 @@ class ICPCMetrics(BaseMetrics):
 
     def get_clusters(self, submissions) -> dict:
         clusters = defaultdict(list)
+        id = 0
+        status = defaultdict(list)
+        status["Test passed"] = 0
+        status["Test failed"] = 0
+        status["Sample passed"] = 0
+        status["Sample failed"] = 0
         for submission in submissions:
             outputs = submission["input_case_results"]
             run_outputs = []
@@ -68,7 +74,16 @@ class ICPCMetrics(BaseMetrics):
             output_key = tuple(run_outputs)
             extract_info = self.extract_info(submission)
             clusters[output_key].append(extract_info)
-        return clusters
+            id = submission["id"]
+            if submission["test_case_results"]["score"] > 0:
+                status["Test passed"] += 1
+            else:
+                status["Test failed"] += 1
+            if submission["test_case_results"]["sample_score"] > 0:
+                status["Sample passed"] += 1
+            else:
+                status["Sample failed"] += 1    
+        return clusters, id, status
 
     def get_metrics(self):
         self.problem_scores = {}
@@ -85,7 +100,7 @@ class ICPCMetrics(BaseMetrics):
             if self.problem_scores.get(name) is None:
                 self.problem_scores[name] = False
             if self.cluster_folder:
-                clusters = self.get_clusters(submission)
+                clusters, id = self.get_clusters(submission)
                 # Create the cluster_folder directory if self.cluster_folder is specified and directory does not exist
                 if self.cluster_folder:
                     os.makedirs(self.cluster_folder, exist_ok=True)
@@ -105,7 +120,7 @@ class ICPCMetrics(BaseMetrics):
                         "codes": codes,
                     }
 
-                output_file = os.path.join(self.cluster_folder, f"{name}_cluster.jsonl")
+                output_file = os.path.join(self.cluster_folder, f"{id}_cluster.jsonl")
                 # Write clusters to {problem_number}_cluster.jsonl
                 with open(output_file, "w") as f:
                     json.dump(final_clusters, f, indent=4)
