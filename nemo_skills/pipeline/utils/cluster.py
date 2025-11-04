@@ -105,9 +105,10 @@ def get_timeout_str(cluster_config, partition, with_save_delay: bool = True) -> 
     timeout_str = f"{timeout.days:02d}:{timeout.seconds // 3600:02d}:{(timeout.seconds % 3600) // 60:02d}:{timeout.seconds % 60:02d}"
     return timeout_str
 
+
 def parse_extra_metrics_arguments(extra_metrics_arguments: str | dict | None) -> dict | None:
     """
-    Parse extra metrics arguments from either a JSON string or a dictionary.  
+    Parse extra metrics arguments from either a JSON string or a dictionary.
 
     This utility function handles extra metrics arguments that can be provided in two ways:
     1. As a JSON string (typically from CLI)
@@ -115,7 +116,7 @@ def parse_extra_metrics_arguments(extra_metrics_arguments: str | dict | None) ->
 
     Args:
         extra_metrics_arguments: Either a JSON string or a dictionary containing extra metrics arguments.
-                         Can also be None or empty string.        
+                         Can also be None or empty string.
 
     Returns:
         A dictionary of slurm kwargs, or None if no arguments are provided.
@@ -137,12 +138,15 @@ def parse_extra_metrics_arguments(extra_metrics_arguments: str | dict | None) ->
             except json.JSONDecodeError as e:
                 raise ValueError(f"Failed to parse extra_metrics_arguments with JSON: {e}")
         else:
-            raise ValueError(f"extra_metrics_arguments must be a string or dict, got {type(extra_metrics_arguments).__name__}")
+            raise ValueError(
+                f"extra_metrics_arguments must be a string or dict, got {type(extra_metrics_arguments).__name__}"
+            )
 
     if not len(full_extra_metrics_arguments):
         return None
 
     return full_extra_metrics_arguments
+
 
 def parse_sbatch_kwargs(sbatch_kwargs: str | dict | None, **kwargs) -> dict | None:
     """

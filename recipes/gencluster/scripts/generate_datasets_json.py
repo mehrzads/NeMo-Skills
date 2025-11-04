@@ -18,8 +18,7 @@ def collect_datasets(root_dir: Path):
         return (0, int(name)) if name.isdigit() else (1, name)
 
     subdirs = sorted([p for p in root_dir.iterdir() if p.is_dir() and p.name.isdigit()], key=sort_key)
-    
-   
+
     # Create mapping from existing directory numbers to sequential 1-39
     directory_mapping = {}
     for i, subdir in enumerate(subdirs, 1):
@@ -29,10 +28,10 @@ def collect_datasets(root_dir: Path):
     for subdir in subdirs:
         original_name = subdir.name
         mapped_name = directory_mapping[original_name]
-        
+
         # Collect .txt files only, sorted lexicographically to keep a stable order
         txt_files = sorted([p for p in subdir.iterdir() if p.is_file() and p.suffix.lower() == ".txt"])
-       
+
         # Track counts for reporting later
         folder_counts.append((original_name, len(txt_files)))
 
@@ -68,7 +67,6 @@ def main() -> None:
         help="Output JSON file name (written under --base-dir)",
     )
 
-
     args = parser.parse_args()
 
     data, folder_counts = collect_datasets(args.base_dir / "generated_datasets")
@@ -85,5 +83,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

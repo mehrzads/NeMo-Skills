@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 
-import os
-import asyncio
-import re
-import json
 import argparse
-from pathlib import Path
-from nemo_skills.code_execution.sandbox import LocalSandbox
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import asyncio
+import json
+import os
+import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+from nemo_skills.code_execution.sandbox import LocalSandbox
+
 
 def extract_final_cpp_block(text):
     """Extract the final C++ code block from text using the provided pattern"""
     pattern = r"```(?:cpp|Cpp)\s*\n(.*?)```"
     matches = re.findall(pattern, text, re.DOTALL)
     return matches[-1] if matches else ""
+
 
 def wait_for_sandbox(sandbox, loop, timeout: int = 240, poll: float = 1.0):
     deadline = loop.time() + timeout
@@ -29,6 +32,7 @@ def wait_for_sandbox(sandbox, loop, timeout: int = 240, poll: float = 1.0):
         loop.run_until_complete(asyncio.sleep(poll))
     raise RuntimeError(f"Sandbox not ready after waiting {timeout}s")
 
+
 def compile_cpp_file(cpp_file_path, binary_dir, sandbox, loop):
     """Compile a C++ file inside the sandbox and return compilation status"""
     cpp_file = Path(cpp_file_path)
@@ -40,13 +44,9 @@ def compile_cpp_file(cpp_file_path, binary_dir, sandbox, loop):
     binary_dir.mkdir(parents=True, exist_ok=True)
 
     # Compile using gnu++17 similar to evaluators
-    compile_cmd = (
-        f"g++ -std=gnu++17 -O2 -pipe -s -o {binary_path} {cpp_file}"
-    )
+    compile_cmd = f"g++ -std=gnu++17 -O2 -pipe -s -o {binary_path} {cpp_file}"
     try:
-        result, _ = loop.run_until_complete(
-            sandbox.execute_code(compile_cmd, language="shell", timeout=120)
-        )
+        result, _ = loop.run_until_complete(sandbox.execute_code(compile_cmd, language="shell", timeout=120))
         stderr = result.get("stderr", "")
         if stderr.strip():
             return False, "Compilation failed", stderr
@@ -54,22 +54,23 @@ def compile_cpp_file(cpp_file_path, binary_dir, sandbox, loop):
     except Exception as e:
         return False, "Error", str(e)
 
+
 def process_jsonl_file(jsonl_path, output_dir, binary_dir, folder_name, source_id, sandbox, loop):
     """Process a single JSONL file; use per-line 'id' to organize outputs."""
     extracted_count = 0
     compiled_count = 0
     compilation_results = []
     split_dir = "gen" if folder_name == "generators" else "val"
-    
+
     try:
-        with open(jsonl_path, 'r', encoding='utf-8') as file:
+        with open(jsonl_path, "r", encoding="utf-8") as file:
             for line_num, line in enumerate(file, 1):
                 try:
                     # Parse JSON line
                     data = json.loads(line.strip())
-                    generation = data.get('generation', '')
-                    pid = str(data.get('id', '')).strip()
-                    
+                    generation = data.get("generation", "")
+                    pid = str(data.get("id", "")).strip()
+
                     if generation and pid:
                         # Ensure per-problem directories exist using per-line id
                         problem_dir = output_dir / f"problem_{pid}"
@@ -93,7 +94,7 @@ def process_jsonl_file(jsonl_path, output_dir, binary_dir, folder_name, source_i
                             print(f"Skip extract (exists): {relative_path}")
                         else:
                             if cpp_code.strip():
-                                with open(output_path, 'w', encoding='utf-8') as cpp_file:
+                                with open(output_path, "w", encoding="utf-8") as cpp_file:
                                     cpp_file.write(cpp_code.strip())
                                 extracted_count += 1
                                 print(f"Extracted C++ code to: {relative_path}")
@@ -104,45 +105,49 @@ def process_jsonl_file(jsonl_path, output_dir, binary_dir, folder_name, source_i
 
                         # Compile only if binary does not already exist
                         if binary_exe_path.exists():
-                            compilation_results.append({
-                                'file': relative_path,
-                                'success': True,
-                                'status': 'Skipped (binary exists)',
-                                'error': ''
-                            })
+                            compilation_results.append(
+                                {
+                                    "file": relative_path,
+                                    "success": True,
+                                    "status": "Skipped (binary exists)",
+                                    "error": "",
+                                }
+                            )
                             compiled_count += 1
-                            print(f"  ✓ Skip compile (exists)")
+                            print("  ✓ Skip compile (exists)")
                         else:
                             success, status, error_msg = compile_cpp_file(output_path, binary_type_dir, sandbox, loop)
-                            compilation_results.append({
-                                'file': relative_path,
-                                'success': success,
-                                'status': status,
-                                'error': error_msg
-                            })
-                            
+                            compilation_results.append(
+                                {"file": relative_path, "success": success, "status": status, "error": error_msg}
+                            )
+
                             if success:
                                 compiled_count += 1
-                                print(f"  ✓ Compiled successfully")
+                                print("  ✓ Compiled successfully")
                             else:
                                 print(f"  ✗ Compilation failed: {status}")
                                 if error_msg.strip():
                                     print(f"    Error: {error_msg.strip()[:100]}...")  # First 100 chars
-                
+
                 except json.JSONDecodeError as e:
                     print(f"Error parsing JSON in {jsonl_path} line {line_num}: {e}")
                 except Exception as e:
                     print(f"Error processing line {line_num} in {jsonl_path}: {e}")
-    
+
     except Exception as e:
         print(f"Error reading file {jsonl_path}: {e}")
-    
+
     return extracted_count, compiled_count, compilation_results
+
 
 def main():
     # Parse arguments
-    parser = argparse.ArgumentParser(description="Extract and compile C++ code from JSONL under generators/ and validators/")
-    parser.add_argument("--input_dir", required=True, help="Input directory containing generators/ and validators/ folders")
+    parser = argparse.ArgumentParser(
+        description="Extract and compile C++ code from JSONL under generators/ and validators/"
+    )
+    parser.add_argument(
+        "--input_dir", required=True, help="Input directory containing generators/ and validators/ folders"
+    )
     parser.add_argument("--workers", type=int, default=(os.cpu_count() or 4), help="Number of parallel worker threads")
     args = parser.parse_args()
 
@@ -154,7 +159,7 @@ def main():
     binary_dir = base_dir / "compiled_binaries"
     output_dir.mkdir(exist_ok=True)
     binary_dir.mkdir(exist_ok=True)
-    
+
     # Statistics tracking
     start_time = time.time()
     total_extracted = 0
@@ -162,15 +167,15 @@ def main():
     processed_files = 0
     all_compilation_results = []
     failed_compilations = []
-    
+
     # Initialize sandbox and verify compiler availability inside sandbox
     worker_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(worker_loop)
     sandbox = LocalSandbox()
     wait_for_sandbox(sandbox, worker_loop)
     try:
-        result, _ = worker_loop.run_until_complete(sandbox.execute_code('g++ --version', language='shell', timeout=30))
-        if result.get('stderr', '').strip():
+        result, _ = worker_loop.run_until_complete(sandbox.execute_code("g++ --version", language="shell", timeout=30))
+        if result.get("stderr", "").strip():
             print("✗ g++ not available inside sandbox")
             return
         print("✓ g++ compiler found in sandbox")
@@ -186,10 +191,10 @@ def main():
             worker_loop.close()
         except Exception:
             pass
-    
+
     # Build task list across both generators and validators
     tasks = []  # list of tuples (folder_name, Path)
-    for folder_name in ['generators', 'validators']:
+    for folder_name in ["generators", "validators"]:
         folder_path = base_dir / folder_name
 
         if not folder_path.exists():
@@ -253,50 +258,50 @@ def main():
                 processed_files += 1
                 all_compilation_results.extend(compilation_results)
 
-                failed_in_file = [r for r in compilation_results if not r['success']]
+                failed_in_file = [r for r in compilation_results if not r["success"]]
                 failed_compilations.extend(failed_in_file)
 
                 print(f"  -> Extracted {extracted} C++ files, compiled {compiled}/{extracted} successfully")
                 if failed_in_file:
                     print(f"  -> {len(failed_in_file)} compilation failures")
-    
+
     # Final summary
-    print(f"\n=== FINAL SUMMARY ===")
+    print("\n=== FINAL SUMMARY ===")
     print(f"Processed JSONL files: {processed_files}")
     print(f"Total C++ files extracted: {total_extracted}")
     print(f"Total C++ files compiled successfully: {total_compiled}")
-    print(f"Compilation success rate: {total_compiled/total_extracted*100:.1f}%" if total_extracted > 0 else "N/A")
-    print(f"\nDirectory structure:")
+    print(f"Compilation success rate: {total_compiled / total_extracted * 100:.1f}%" if total_extracted > 0 else "N/A")
+    print("\nDirectory structure:")
     print(f"  {output_dir}/")
-    print(f"    problem_*/")
-    print(f"      gen/        (from generators)")
-    print(f"      val/        (from validators)")
+    print("    problem_*/")
+    print("      gen/        (from generators)")
+    print("      val/        (from validators)")
     print(f"  {binary_dir}/")
-    print(f"    problem_*/")
-    print(f"      gen/        (compiled binaries)")
-    print(f"      val/        (compiled binaries)")
-    
+    print("    problem_*/")
+    print("      gen/        (compiled binaries)")
+    print("      val/        (compiled binaries)")
+
     # Detailed failure analysis
     if failed_compilations:
         print(f"\n=== COMPILATION FAILURES ({len(failed_compilations)}) ===")
         failure_types = {}
         for failure in failed_compilations:
-            status = failure['status']
+            status = failure["status"]
             failure_types[status] = failure_types.get(status, 0) + 1
-        
+
         for failure_type, count in sorted(failure_types.items()):
             print(f"  {failure_type}: {count} files")
-        
+
         # Show first few detailed errors
-        print(f"\nFirst 5 compilation errors:")
+        print("\nFirst 5 compilation errors:")
         for i, failure in enumerate(failed_compilations[:5]):
-            print(f"  {i+1}. {failure['file']}: {failure['status']}")
-            if failure['error'].strip():
-                error_lines = failure['error'].strip().split('\n')
+            print(f"  {i + 1}. {failure['file']}: {failure['status']}")
+            if failure["error"].strip():
+                error_lines = failure["error"].strip().split("\n")
                 for line in error_lines[:2]:  # Show first 2 lines of error
                     print(f"     {line}")
                 if len(error_lines) > 2:
-                    print(f"     ... (and {len(error_lines)-2} more lines)")
+                    print(f"     ... (and {len(error_lines) - 2} more lines)")
     else:
         print("\n🎉 All files compiled successfully!")
 
@@ -306,6 +311,7 @@ def main():
     hh, mm = divmod(mm, 60)
     human = (f"{hh}h {mm}m {ss}s" if hh else f"{mm}m {ss}s") if mm or hh else f"{int(elapsed)}s"
     print(f"\nTime spent: {human} ({elapsed:.1f}s)")
+
 
 if __name__ == "__main__":
     main()

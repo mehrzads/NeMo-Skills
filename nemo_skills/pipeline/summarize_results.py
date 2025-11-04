@@ -25,7 +25,6 @@ from typing import Optional
 import typer
 
 from nemo_skills.dataset.utils import ExtraDatasetType
-from nemo_skills.pipeline.utils import parse_extra_metrics_arguments
 from nemo_skills.evaluation.metrics import ComputeMetrics, default_formatting
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
@@ -35,6 +34,7 @@ from nemo_skills.pipeline.utils import (
     get_cluster_config,
     get_env_variables,
     get_unmounted_path,
+    parse_extra_metrics_arguments,
     resolve_mount_paths,
 )
 from nemo_skills.utils import get_logger_name, setup_logging, validate_wandb_project_name
@@ -288,7 +288,12 @@ def summarize_results(
             continue
 
         if metric_type is not None:
-            metrics_calculator = ComputeMetrics(benchmark, metric_type=metric_type, max_samples=max_samples, extra_metrics_arguments=extra_metrics_arguments)
+            metrics_calculator = ComputeMetrics(
+                benchmark,
+                metric_type=metric_type,
+                max_samples=max_samples,
+                extra_metrics_arguments=extra_metrics_arguments,
+            )
         else:
             metrics_calculator = ComputeMetrics(
                 benchmark,

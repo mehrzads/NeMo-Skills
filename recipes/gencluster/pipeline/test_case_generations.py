@@ -1,6 +1,4 @@
-from pydantic import BaseModel
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
-from pathlib import Path
 
 if __name__ == "__main__":
     cluster = "iad"
@@ -21,14 +19,14 @@ if __name__ == "__main__":
             "++prompt_config=/nemo_run/code/recipes/gencluster/prompts/generator.yaml "
             "++inference.temperature=1.0 "
             "++inference.top_p=1.0 "
-            "++inference.tokens_to_generate=120000 " 
+            "++inference.tokens_to_generate=120000 "
             "++inference.extra_body.reasoning_effort=high "
             "++max_concurrent_requests=1024 "
         ),
         cluster=cluster,
         input_file=input_file,
-        output_dir=output_dir+"/generators",
-        expname=expname+"_generators",
+        output_dir=output_dir + "/generators",
+        expname=expname + "_generators",
         model=model_path,
         server_type="vllm",
         server_gpus=server_gpus,
@@ -45,14 +43,14 @@ if __name__ == "__main__":
             "++prompt_config=/nemo_run/code/recipes/gencluster/prompts/validator.yaml "
             "++inference.temperature=1.0 "
             "++inference.top_p=1.0 "
-            "++inference.tokens_to_generate=120000 " 
+            "++inference.tokens_to_generate=120000 "
             "++inference.extra_body.reasoning_effort=high "
             "++max_concurrent_requests=1024 "
         ),
         cluster=cluster,
         input_file=input_file,
-        output_dir=output_dir+"/validators",
-        expname=expname+"_validators",
+        output_dir=output_dir + "/validators",
+        expname=expname + "_validators",
         model=model_path,
         server_type="vllm",
         server_gpus=server_gpus,
@@ -64,19 +62,19 @@ if __name__ == "__main__":
     )
 
     genrate_tests_command = f"python /nemo_run/code/recipes/gencluster/scripts/extract_cpp_code.py --input_dir {output_dir} --workers 10 ; python /nemo_run/code/recipes/gencluster/scripts/generate_tests.py 100 --min-validators 75 --base-dir {output_dir} --workers-problems 12  --workers-generators 2; python /nemo_run/code/recipes/gencluster/scripts/generate_datasets_json.py --base-dir {output_dir} --output-file-name {model_name}_{100}.json"
-    
+
     run_cmd(
-        ctx=wrap_arguments(""), 
+        ctx=wrap_arguments(""),
         cluster=cluster,
         command=genrate_tests_command,
-        expname=expname+"_tests",
-        log_dir=str(output_dir+"/test_case_generations_logs"),
+        expname=expname + "_tests",
+        log_dir=str(output_dir + "/test_case_generations_logs"),
         num_nodes=1,
         num_gpus=0,
         with_sandbox=True,
         get_random_port=True,
         keep_mounts_for_sandbox=True,
-       # run_after=[expname+"_generators", expname+"_validators"],
+        # run_after=[expname+"_generators", expname+"_validators"],
         exclusive=True,
         time_min="04:00:00",
     )
