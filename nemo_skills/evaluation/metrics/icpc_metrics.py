@@ -14,6 +14,7 @@
 import json
 import os
 from collections import defaultdict
+import re
 
 from nemo_skills.evaluation.metrics.base import BaseMetrics, as_float, as_int
 
