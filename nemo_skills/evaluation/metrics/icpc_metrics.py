@@ -17,6 +17,10 @@ from collections import defaultdict
 
 from nemo_skills.evaluation.metrics.base import BaseMetrics, as_float, as_int
 
+def extract_final_cpp_block(text):
+    pattern = r"```(?:cpp|Cpp)\s*\n(.*?)```"
+    matches = re.findall(pattern, text, re.DOTALL)
+    return matches[-1] if matches else ""
 
 class ICPCMetrics(BaseMetrics):
     def __init__(self, cluster_folder=None):
@@ -49,6 +53,7 @@ class ICPCMetrics(BaseMetrics):
         return {
             "score": submission["test_case_results"]["score"],
             "sample_score": submission["test_case_results"]["sample_score"],
+            "code": extract_final_cpp_block(submission["generation"]),
         }
 
     def get_clusters(self, submissions) -> dict:
