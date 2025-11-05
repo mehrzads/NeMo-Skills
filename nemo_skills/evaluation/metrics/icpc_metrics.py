@@ -110,8 +110,7 @@ class ICPCMetrics(BaseMetrics):
             if self.cluster_folder:
                 clusters, id  = self.get_clusters(submission)
                 # Create the cluster_folder directory if self.cluster_folder is specified and directory does not exist
-                if self.cluster_folder:
-                    os.makedirs(self.cluster_folder, exist_ok=True)
+                os.makedirs(self.cluster_folder, exist_ok=True)
 
                 # Prepare final clustered data
                 final_clusters = {}
@@ -131,7 +130,6 @@ class ICPCMetrics(BaseMetrics):
                 with open(output_file, "w") as f:
                     json.dump(final_clusters, f, indent=4)
 
-                print(f"Number of clusters: {len(clusters)}")
             scores = self.get_problem_score(submission)
             sample_scores = self.get_problem_sample_score(submission)
             self.correct_submissions[name] += sum(1 for value in scores if value)
