@@ -11,17 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+
 import json
 import os
-from collections import defaultdict
 import re
+from collections import defaultdict
 
 from nemo_skills.evaluation.metrics.base import BaseMetrics, as_float, as_int
+
 
 def extract_final_cpp_block(text):
     pattern = r"```(?:cpp|Cpp)\s*\n(.*?)```"
     matches = re.findall(pattern, text, re.DOTALL)
     return matches[-1] if matches else ""
+
 
 class ICPCMetrics(BaseMetrics):
     def __init__(self, **kwargs):
@@ -61,8 +65,7 @@ class ICPCMetrics(BaseMetrics):
     def get_clusters(self, submissions) -> dict:
         clusters = defaultdict(list)
         id = 0
-        status = defaultdict(list)
-        
+
         for submission in submissions:
             outputs = submission["input_case_results"]
             run_outputs = []
@@ -81,7 +84,7 @@ class ICPCMetrics(BaseMetrics):
                     "codes": [],
                 }
             clusters[output_key]["codes"].append(extract_info)
-            
+
             id = submission["id"]
             if submission["test_case_results"]["score"] > 0:
                 clusters[output_key]["status"]["Test passed"] += 1
@@ -90,7 +93,7 @@ class ICPCMetrics(BaseMetrics):
             if submission["test_case_results"]["sample_score"] > 0:
                 clusters[output_key]["status"]["Sample passed"] += 1
             else:
-                clusters[output_key]["status"]["Sample failed"] += 1    
+                clusters[output_key]["status"]["Sample failed"] += 1
         return clusters, id
 
     def get_metrics(self):
@@ -107,8 +110,9 @@ class ICPCMetrics(BaseMetrics):
                 self.correct_sample_submissions[name] = 0
             if self.problem_scores.get(name) is None:
                 self.problem_scores[name] = False
+            # Cluster the submissions
             if self.cluster_folder:
-                clusters, id  = self.get_clusters(submission)
+                clusters, id = self.get_clusters(submission)
                 # Create the cluster_folder directory if self.cluster_folder is specified and directory does not exist
                 os.makedirs(self.cluster_folder, exist_ok=True)
 
@@ -117,12 +121,11 @@ class ICPCMetrics(BaseMetrics):
 
                 # Convert tuple keys to string for JSON serialization
                 for i, (output_key, cluster) in enumerate(clusters.items()):
-                    # Compute score as sum of popularity counts for each position's output                     
+                    # Compute score as sum of popularity counts for each position's output
                     final_clusters[f"cluster_{i + 1}"] = {
-                        "output": output_key,                        
+                        "output": output_key,
                         "status": cluster["status"],
                         "codes": cluster["codes"],
-                        
                     }
 
                 output_file = os.path.join(self.cluster_folder, f"{id}_cluster.jsonl")

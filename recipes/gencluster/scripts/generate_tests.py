@@ -288,9 +288,9 @@ def generate_datasets_for_problem(
             try:
                 mv_res, _ = loop.run_until_complete(
                     sandbox.execute_code(
-                        f"mv {shlex.quote(sandbox_tmp_path)} {shlex.quote(str(dataset_path))}", 
-                        language="shell", 
-                        timeout=30
+                        f"mv {shlex.quote(sandbox_tmp_path)} {shlex.quote(str(dataset_path))}",
+                        language="shell",
+                        timeout=30,
                     )
                 )
                 if mv_res.get("process_status") != "completed":

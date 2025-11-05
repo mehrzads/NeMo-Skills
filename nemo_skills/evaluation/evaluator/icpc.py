@@ -28,7 +28,7 @@ from nemo_skills.file_utils import jdump
 from nemo_skills.utils import nested_dataclass, unroll_files
 
 
-def sha256_hex(text: str) -> str:    
+def sha256_hex(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
 
 
@@ -406,8 +406,6 @@ class ICPCEvaluator(BaseEvaluator):
                 else:
                     if float(result.get("score", 0)) == 0.0:
                         problem_state["test_passed"] = False
-
-               
 
         test_case_results = {
             "sample_score": problem_state["sample_passed"],
