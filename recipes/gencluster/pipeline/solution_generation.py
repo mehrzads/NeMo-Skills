@@ -21,7 +21,7 @@ eval(
     server_type="vllm",
     server_gpus=8,
     num_jobs=100,
-    benchmarks="icpc25:100",
+    benchmarks="icpc25:1000",
     data_dir="/workspace/llmcoding/eval_dataset/",
     output_dir="/workspace/gpt-oss-120b/generation/run_2_icpc25_1000/",
     metrics_kwargs='{"cluster_folder": "/workspace/gpt-oss-120b/generation/run_2_icpc25_1000/clusters/"}',
