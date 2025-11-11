@@ -28,8 +28,8 @@ eval(
     num_jobs=100,
     benchmarks="icpc:1000",
     data_dir="/workspace/llmcoding/eval_dataset/",
-    output_dir=f"/workspace/results/icpc24/gpt-oss-120b/generation/run_{run_number}/",
-    metrics_kwargs=f'{{"cluster_folder": "/workspace/results/icpc24/gpt-oss-120b/generation/run_{run_number}/clusters/"}}',
+    output_dir=f"/workspace/results/icpc25/gpt-oss-120b/generation/run_{run_number}/",
+    metrics_kwargs=f'{{"cluster_folder": "/workspace/results/icpc25/gpt-oss-120b/generation/run_{run_number}/clusters/"}}',
     split="icpc25",
     time_min="04:00:00",
 )
