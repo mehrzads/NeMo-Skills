@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,36 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-*.json
-*.tar.gz
-*.tar
-*.npy
-*.info
-*.jsonl
-*.csv
-nemo_experiments
-wandb
-build
-.hypothesis
-*.zip
-*.egg-info
-*.xml
-*.DS_Store
-.coverage
-.venv
-*.lock
+# Define MMAU-Pro as a benchmark group with three separate evaluation types
+DATASET_GROUP = "speechlm"
+IS_BENCHMARK_GROUP = True
+SCORE_MODULE = "nemo_skills.dataset.mmau-pro.mmau_pro_score"
 
-__pycache__
-.ipynb_checkpoints
-
-cluster_configs/*
-!cluster_configs/example-*.yaml
-
-nemo_skills/dataset/ruler/*/
-nemo_skills/dataset/bfcl_v3/*/
-nemo_skills/dataset/aalcr/lcr/
-.idea/
-.idea/*
-CLAUDE.md
-
-.idea
+# Three separate benchmark subgroups for different evaluation approaches
+BENCHMARKS = {
+    "mmau-pro.closed_form": {},
+    "mmau-pro.open_ended": {},
+    "mmau-pro.instruction_following": {},
+}
