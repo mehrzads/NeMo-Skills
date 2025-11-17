@@ -17,7 +17,6 @@ eval(
         "++inference.extra_body.reasoning_effort=high "
         "++max_concurrent_requests=1024 "
         f"++eval_config.test_file=/workspace/llmcoding/eval_dataset/icpc/icpc{icpc_year}_metadata.json "
-        f"++eval_config.input_file=/workspace/results/icpc{icpc_year}/gpt-oss-120b/gencluster/gpt-oss-120b_100.json "
     ),
     cluster="iad",
     with_sandbox=True,
@@ -26,11 +25,12 @@ eval(
     model="/hf_models/gpt-oss-120b",
     server_type="vllm",
     server_gpus=8,
-    num_jobs=100,
-    benchmarks="icpc:1000",
+    num_jobs=10,
+    benchmarks="icpc:50",
     data_dir="/workspace/llmcoding/eval_dataset/",
-    output_dir=f"/workspace/results/icpc{icpc_year}/gpt-oss-120b/generation/run_{run_number}/",
-    metrics_kwargs=f'{{"cluster_folder": "/workspace/results/icpc{icpc_year}/gpt-oss-120b/generation/run_{run_number}/clusters/"}}',
+    output_dir=f"/workspace/results/tests/icpc{icpc_year}/gpt-oss-120b/generation/run_{run_number}/",
+    metrics_kwargs=f'{{"cluster_folder": "/workspace/results/tests/icpc{icpc_year}/gpt-oss-120b/generation/run_{run_number}/clusters/"}}',
     split=f"icpc{icpc_year}",
     time_min="04:00:00",
 )
+#        f"++eval_config.input_file=/workspace/results/icpc{icpc_year}/gpt-oss-120b/gencluster/gpt-oss-120b_100.json "
