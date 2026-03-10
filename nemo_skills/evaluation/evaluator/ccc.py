@@ -12,6 +12,8 @@ from nemo_skills.utils import nested_dataclass
 @nested_dataclass(kw_only=True)
 class CCCEvaluatorConfig(BaseEvaluatorConfig):
     test_file: str = "test_metadata.json"
+    test_batch_size: int = 16
+    time_scale: float = 1.0
     benchmark_type: str | None = None
 
 
