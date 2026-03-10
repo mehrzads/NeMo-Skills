@@ -33,6 +33,7 @@ class IOIEvaluatorConfig(BaseEvaluatorConfig):
     input_file: str | None = None
     num_workers: int = 16  # number of test workers
     test_batch_size: int = 16  # number of tests to run concurrently
+    time_scale: float = 1.0  # multiplies per-test time limit used by run scripts
     overwrite: bool = False
 
 
@@ -166,7 +167,8 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             return result
 
         # 3. Run the code
-        run_command = f"cd {unique_dir} && ./run.sh"
+        time_scale = float(task_args.get("time_scale", 1.0))
+        run_command = f"cd {unique_dir} && TIME_LIMIT_SCALE={time_scale} ./run.sh"
         run_result, _ = worker_loop.run_until_complete(
             sandbox.execute_code(run_command, language="shell", timeout=120)
         )
@@ -242,7 +244,8 @@ def run_input_case(task_args: dict, worker_id: int) -> dict:
             return result
 
         # 3. Run the code using run_files runner
-        run_command = f"cd {unique_dir} && ./run < input.txt"
+        time_scale = float(task_args.get("time_scale", 1.0))
+        run_command = f"cd {unique_dir} && TIME_LIMIT_SCALE={time_scale} ./run < input.txt"
         run_result, _ = worker_loop.run_until_complete(
             sandbox.execute_code(run_command, language="shell", timeout=120, max_output_characters=1000000)
         )
@@ -410,6 +413,7 @@ class IOIEvaluator(BaseEvaluator):
                         "precompiled_dir": pre_dir,
                         "test_input": test_data["input"],
                         "test_output": test_data["output"],
+                        "time_scale": self.eval_cfg.time_scale,
                     }
                 )
 
@@ -453,6 +457,7 @@ class IOIEvaluator(BaseEvaluator):
                             "problem_id": pid,
                             "run_files": run_files,
                             "test_input": test_data["content"],
+                            "time_scale": self.eval_cfg.time_scale,
                         }
                     )
                 # map with unique worker id argument

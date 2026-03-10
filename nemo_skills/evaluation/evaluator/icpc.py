@@ -37,6 +37,7 @@ class ICPCEvaluatorConfig(BaseEvaluatorConfig):
     test_file: str = "test_metadata.json"
     input_file: str = None
     test_batch_size: int = 16  # number of tests to run concurrently
+    time_scale: float = 1.0
 
 
 _precompile_loop_tls = threading.local()
@@ -62,6 +63,19 @@ def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shel
     return loop.run_until_complete(sandbox.execute_code(cmd, language=language, timeout=timeout))[0]
 
 
+def wait_for_sandbox(sandbox, timeout: int = 240, poll: float = 1.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            resp = _sandbox_exec_sync(sandbox, "echo hello world", language="shell", timeout=10)
+            if resp.get("stdout", "").strip() == "hello world":
+                return
+        except Exception:
+            pass
+        time.sleep(poll)
+    raise RuntimeError(f"Sandbox not ready after waiting {timeout}s")
+
+
 def init_worker():
     """Per-process initializer: set up an event loop for httpx/asyncio calls."""
     global worker_sandbox, worker_loop
@@ -77,6 +91,7 @@ def _precompile_grader(
     # Ensure sandbox belongs to this thread; if not, create a local one.
     if getattr(sandbox, "_owner_tid", None) != threading.get_ident():
         sandbox = LocalSandbox()
+        wait_for_sandbox(sandbox)
         sandbox._owner_tid = threading.get_ident()
 
     pre_dir = f"/nemo_run/icpc_pre_{problem_name}_{os.getpid()}"
@@ -158,8 +173,9 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
 
         # 3. Run the code
         run_command = f"cd {unique_dir} && ./run.sh"
+        run_timeout = max(1, int(120 * float(task_args.get("time_scale", 1.0))))
         run_result, _ = worker_loop.run_until_complete(
-            sandbox.execute_code(run_command, language="shell", timeout=120)
+            sandbox.execute_code(run_command, language="shell", timeout=run_timeout)
         )
 
         run_stdout = run_result.get("stdout", "")
@@ -232,8 +248,14 @@ def run_input_case(task_args: dict, worker_id: int) -> dict:
 
         # 3. Run the code
         run_command = f"cd {unique_dir} && ./user_run.sh"
+        run_timeout = max(1, int(120 * float(task_args.get("time_scale", 1.0))))
         run_result, _ = worker_loop.run_until_complete(
-            sandbox.execute_code(run_command, language="shell", timeout=120, max_output_characters=1000000)
+            sandbox.execute_code(
+                run_command,
+                language="shell",
+                timeout=run_timeout,
+                max_output_characters=1000000,
+            )
         )
 
         run_stdout = sha256_hex(run_result.get("stdout", ""))
@@ -305,6 +327,7 @@ class ICPCEvaluator(BaseEvaluator):
         # Run blocking setup in a background thread to avoid nested event‐loop issues.
         def _setup():
             sbox = LocalSandbox()
+            wait_for_sandbox(sbox)
             # Remember the thread id that owns this sandbox instance.
             sbox._owner_tid = threading.get_ident()
 
@@ -387,6 +410,7 @@ class ICPCEvaluator(BaseEvaluator):
                         "precompiled_dir": pre_dir,
                         "test_input": test_case["input"],
                         "test_output": test_case["output"],
+                        "time_scale": self.eval_cfg.time_scale,
                     }
                 )
 
@@ -425,6 +449,7 @@ class ICPCEvaluator(BaseEvaluator):
                             "problem_id": pid,
                             "precompiled_dir": pre_dir,
                             "test_input": test_data["content"],
+                            "time_scale": self.eval_cfg.time_scale,
                         }
                     )
                 # map with unique worker id argument
