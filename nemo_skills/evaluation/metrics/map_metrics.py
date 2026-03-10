@@ -29,6 +29,7 @@ from nemo_skills.evaluation.metrics.code_metrics import (
     SciCodeMetrics,
     SweBenchMetrics,
 )
+from nemo_skills.evaluation.metrics.ccc_metrics import CCCMetrics
 from nemo_skills.evaluation.metrics.critpt_metrics import CritPtMetrics
 from nemo_skills.evaluation.metrics.gradingbench_metrics import GradingBenchMetrics
 from nemo_skills.evaluation.metrics.hleaa_metrics import HLEAAMetrics
@@ -67,6 +68,7 @@ METRICS_MAP = {
     "if": IFMetrics,
     "ioi": IOIMetrics,
     "icpc": ICPCMetrics,
+    "ccc": CCCMetrics,
     "multichoice": MathMetrics,
     "ruler": RulerMetrics,
     "ruler2": RulerMetrics,
