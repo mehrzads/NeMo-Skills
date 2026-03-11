@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import multiprocessing
 import os
 import re
 import shutil
@@ -25,8 +26,9 @@ class CCCEvaluatorConfig(BaseEvaluatorConfig):
 
 
 _precompile_loop_tls = threading.local()
-_test_loop_tls = threading.local()
 worker_sandbox = None  # type: ignore
+worker_loop = asyncio.new_event_loop()
+asyncio.set_event_loop(worker_loop)
 
 
 def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shell", timeout: int = 120):
@@ -37,12 +39,11 @@ def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shel
     return loop.run_until_complete(sandbox.execute_code(cmd, language=language, timeout=timeout))[0]
 
 
-def _test_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shell", timeout: int = 120):
-    loop = getattr(_test_loop_tls, "loop", None)
-    if loop is None or loop.is_closed():
-        loop = asyncio.new_event_loop()
-        _test_loop_tls.loop = loop
-    return loop.run_until_complete(sandbox.execute_code(cmd, language=language, timeout=timeout))[0]
+def init_worker():
+    global worker_sandbox, worker_loop
+    worker_sandbox = None
+    worker_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(worker_loop)
 
 
 def wait_for_sandbox(sandbox, timeout: int = 240, poll: float = 1.0):
@@ -102,7 +103,9 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             f.write(task_args["test_output"])
 
         sandbox = LocalSandbox()
-        compile_result = _test_exec_sync(sandbox, f"cd {unique_dir} && ./compile.sh", language="shell", timeout=120)
+        compile_result, _ = worker_loop.run_until_complete(
+            sandbox.execute_code(f"cd {unique_dir} && ./compile.sh", language="shell", timeout=120)
+        )
         result = {
             "compile_success": not compile_result.get("stderr"),
             "compile_stdout": compile_result.get("stdout", ""),
@@ -116,11 +119,12 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             return result
 
         run_timeout = max(1, int(120 * float(task_args.get("time_scale", 1.0))))
-        run_result = _test_exec_sync(
-            sandbox,
-            f"cd {unique_dir} && export TMPDIR={unique_dir}/tmp && TIME_LIMIT_SCALE={task_args.get('time_scale', 1.0)} ./run.sh",
-            language="shell",
-            timeout=run_timeout,
+        run_result, _ = worker_loop.run_until_complete(
+            sandbox.execute_code(
+                f"cd {unique_dir} && export TMPDIR={unique_dir}/tmp && TIME_LIMIT_SCALE={task_args.get('time_scale', 1.0)} ./run.sh",
+                language="shell",
+                timeout=run_timeout,
+            )
         )
         result["run_stdout"] = run_result.get("stdout", "")
         result["run_stderr"] = run_result.get("stderr", "")
@@ -172,6 +176,7 @@ class CCCEvaluator(BaseEvaluator):
         self.sandbox = None
         self.metadata = None
         self.precompiled_cache = {}
+        self.pool = None
 
     async def _initialize_runtime(self):
         if self.sandbox is not None:
@@ -185,9 +190,13 @@ class CCCEvaluator(BaseEvaluator):
                 raise FileNotFoundError(f"Metadata file {self.eval_cfg.test_file} does not exist.")
             with open(self.eval_cfg.test_file, "r", encoding="utf-8") as f:
                 metadata_local = json.load(f)
-            return sbox, metadata_local
+            pool_local = multiprocessing.Pool(
+                processes=self.eval_cfg.test_batch_size,
+                initializer=init_worker,
+            )
+            return sbox, metadata_local, pool_local
 
-        self.sandbox, self.metadata = await asyncio.to_thread(_setup)
+        self.sandbox, self.metadata, self.pool = await asyncio.to_thread(_setup)
 
     def _get_precompiled_dir(self, problem_id: str, problem_metadata: dict):
         if problem_id in self.precompiled_cache:
@@ -240,11 +249,18 @@ class CCCEvaluator(BaseEvaluator):
 
         all_test_items = list(problem_metadata["all_tests"].items())
         test_outputs = {}
-        for idx, (test_name, test_data) in enumerate(all_test_items):
-            task = self._build_test_task(problem_id, pre_dir, completion, test_data)
-            result = await asyncio.to_thread(run_test_case, task, idx)
-            result["test_name"] = test_name
-            test_outputs[test_name] = result
+        batch_size = self.eval_cfg.test_batch_size
+        for i in range(0, len(all_test_items), batch_size):
+            batch = all_test_items[i : i + batch_size]
+            tasks = []
+            for _, test_data in batch:
+                tasks.append(self._build_test_task(problem_id, pre_dir, completion, test_data))
+            results = await asyncio.to_thread(
+                self.pool.starmap, run_test_case, [(task, idx) for idx, task in enumerate(tasks)]
+            )
+            for (test_name, _), result in zip(batch, results):
+                result["test_name"] = test_name
+                test_outputs[test_name] = result
 
         test_case_results = {}
         for subtask_name, subtask_meta in problem_metadata["subtasks"].items():
@@ -265,10 +281,15 @@ class CCCEvaluator(BaseEvaluator):
         for jsonl_file in unroll_files(input_files):
             with open(jsonl_file, "r", encoding="utf-8") as f:
                 all_samples = [json.loads(line) for line in f]
-            for sample in all_samples:
-                output = await self._evaluate_entry(sample)
+            tasks = [self._evaluate_entry(sample) for sample in all_samples]
+            outputs = await asyncio.gather(*tasks)
+            for sample, output in zip(all_samples, outputs):
                 sample["test_case_results"] = output["test_case_results"]
             jdump(all_samples, jsonl_file, mode="wt")
+
+        if self.pool is not None:
+            self.pool.close()
+            self.pool.join()
 
     async def eval_single(self, data_point: dict):
         return await self._evaluate_entry(data_point)
