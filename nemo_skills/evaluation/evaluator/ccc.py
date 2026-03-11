@@ -223,9 +223,11 @@ class CCCEvaluator(BaseEvaluator):
             "time_scale": self.eval_cfg.time_scale,
         }
 
-    def _aggregate_subtask_score(self, subtask_meta: dict, outputs: list[dict]) -> float:
+    def _aggregate_subtask_score(self, subtask_meta: dict, outputs: list[dict], failed: bool = False) -> float:
         aggregation = subtask_meta["aggregation"]
         if aggregation == "min":
+            if failed:
+                return 0.0
             scores = [float(out.get("score", 0.0)) for out in outputs]
             return round(
                 (min(scores) if scores else 0.0) * float(subtask_meta["score"]),
@@ -247,27 +249,58 @@ class CCCEvaluator(BaseEvaluator):
         )
         pre_dir = await asyncio.to_thread(self._get_precompiled_dir, problem_id, problem_metadata)
 
+        subtask_state = {
+            subtask_name: {
+                "aggregation": subtask_meta["aggregation"],
+                "outputs": [],
+                "failed": False,
+            }
+            for subtask_name, subtask_meta in problem_metadata["subtasks"].items()
+        }
+        test_to_subtasks = {}
+        for subtask_name, subtask_meta in problem_metadata["subtasks"].items():
+            for test_name in subtask_meta["test_names"]:
+                test_to_subtasks.setdefault(test_name, []).append(subtask_name)
+
         all_test_items = list(problem_metadata["all_tests"].items())
-        test_outputs = {}
         batch_size = self.eval_cfg.test_batch_size
         for i in range(0, len(all_test_items), batch_size):
-            batch = all_test_items[i : i + batch_size]
+            candidate_batch = all_test_items[i : i + batch_size]
+            batch = []
             tasks = []
-            for _, test_data in batch:
+            for test_name, test_data in candidate_batch:
+                subtasks = test_to_subtasks.get(test_name, [])
+                should_run = False
+                for subtask_name in subtasks:
+                    state = subtask_state[subtask_name]
+                    if state["aggregation"] == "sum_tests" or not state["failed"]:
+                        should_run = True
+                        break
+                if not should_run:
+                    continue
+                batch.append((test_name, test_data))
                 tasks.append(self._build_test_task(problem_id, pre_dir, completion, test_data))
+            if not batch:
+                continue
             results = await asyncio.to_thread(
                 self.pool.starmap, run_test_case, [(task, idx) for idx, task in enumerate(tasks)]
             )
             for (test_name, _), result in zip(batch, results):
                 result["test_name"] = test_name
-                test_outputs[test_name] = result
+                for subtask_name in test_to_subtasks.get(test_name, []):
+                    state = subtask_state[subtask_name]
+                    if state["aggregation"] == "min" and state["failed"]:
+                        continue
+                    state["outputs"].append(dict(result))
+                    if state["aggregation"] == "min" and float(result.get("score", 0.0)) == 0.0:
+                        state["failed"] = True
 
         test_case_results = {}
         for subtask_name, subtask_meta in problem_metadata["subtasks"].items():
-            outputs = [dict(test_outputs[test_name]) for test_name in subtask_meta["test_names"]]
+            state = subtask_state[subtask_name]
             test_case_results[subtask_name] = {
-                "score": self._aggregate_subtask_score(subtask_meta, outputs),
-                "outputs": outputs,
+                "score": self._aggregate_subtask_score(subtask_meta, state["outputs"], failed=state["failed"]),
+                "outputs": state["outputs"],
             }
 
 
