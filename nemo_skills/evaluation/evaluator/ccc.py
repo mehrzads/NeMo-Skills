@@ -172,7 +172,6 @@ class CCCEvaluator(BaseEvaluator):
         self.sandbox = None
         self.metadata = None
         self.precompiled_cache = {}
-        self.test_semaphore = None
 
     async def _initialize_runtime(self):
         if self.sandbox is not None:
@@ -189,7 +188,6 @@ class CCCEvaluator(BaseEvaluator):
             return sbox, metadata_local
 
         self.sandbox, self.metadata = await asyncio.to_thread(_setup)
-        self.test_semaphore = asyncio.Semaphore(max(1, int(self.eval_cfg.test_batch_size)))
 
     def _get_precompiled_dir(self, problem_id: str, problem_metadata: dict):
         if problem_id in self.precompiled_cache:
@@ -216,12 +214,6 @@ class CCCEvaluator(BaseEvaluator):
             "time_scale": self.eval_cfg.time_scale,
         }
 
-    async def _run_test_task(self, task: dict, worker_id: int) -> dict:
-        if self.test_semaphore is None:
-            raise RuntimeError("CCC evaluator runtime is not initialized.")
-        async with self.test_semaphore:
-            return await asyncio.to_thread(run_test_case, task, worker_id)
-
     def _aggregate_subtask_score(self, subtask_meta: dict, outputs: list[dict]) -> float:
         aggregation = subtask_meta["aggregation"]
         if aggregation == "min":
@@ -247,13 +239,10 @@ class CCCEvaluator(BaseEvaluator):
         pre_dir = await asyncio.to_thread(self._get_precompiled_dir, problem_id, problem_metadata)
 
         all_test_items = list(problem_metadata["all_tests"].items())
-        tasks = []
+        test_outputs = {}
         for idx, (test_name, test_data) in enumerate(all_test_items):
             task = self._build_test_task(problem_id, pre_dir, completion, test_data)
-            tasks.append(self._run_test_task(task, idx))
-        results = await asyncio.gather(*tasks)
-        test_outputs = {}
-        for (test_name, _), result in zip(all_test_items, results):
+            result = await asyncio.to_thread(run_test_case, task, idx)
             result["test_name"] = test_name
             test_outputs[test_name] = result
 
