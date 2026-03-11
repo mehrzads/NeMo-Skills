@@ -265,9 +265,9 @@ class CCCEvaluator(BaseEvaluator):
         for jsonl_file in unroll_files(input_files):
             with open(jsonl_file, "r", encoding="utf-8") as f:
                 all_samples = [json.loads(line) for line in f]
-            outputs = await asyncio.gather(*[self._evaluate_entry(s) for s in all_samples])
-            for s, o in zip(all_samples, outputs):
-                s["test_case_results"] = o["test_case_results"]
+            for sample in all_samples:
+                output = await self._evaluate_entry(sample)
+                sample["test_case_results"] = output["test_case_results"]
             jdump(all_samples, jsonl_file, mode="wt")
 
     async def eval_single(self, data_point: dict):
