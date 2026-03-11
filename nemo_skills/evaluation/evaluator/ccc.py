@@ -92,6 +92,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         precompiled_dir = task_args.get("precompiled_dir")
         os.makedirs(unique_dir, exist_ok=True)
         os.makedirs(os.path.join(unique_dir, "graders"), exist_ok=True)
+        os.makedirs(os.path.join(unique_dir, "tmp"), exist_ok=True)
         if precompiled_dir and os.path.isdir(precompiled_dir):
             shutil.copytree(precompiled_dir, unique_dir, dirs_exist_ok=True)
         with open(os.path.join(unique_dir, "graders", f"{task_args['problem_id']}.cpp"), "w", encoding="utf-8") as f:
@@ -120,7 +121,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         run_timeout = max(1, int(120 * float(task_args.get("time_scale", 1.0))))
         run_result, _ = worker_loop.run_until_complete(
             sandbox.execute_code(
-                f"cd {unique_dir} && TIME_LIMIT_SCALE={task_args.get('time_scale', 1.0)} ./run.sh",
+                f"cd {unique_dir} && export TMPDIR={unique_dir}/tmp && TIME_LIMIT_SCALE={task_args.get('time_scale', 1.0)} ./run.sh",
                 language="shell",
                 timeout=run_timeout,
             )
