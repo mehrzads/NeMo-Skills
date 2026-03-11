@@ -25,9 +25,8 @@ class CCCEvaluatorConfig(BaseEvaluatorConfig):
 
 
 _precompile_loop_tls = threading.local()
+_test_loop_tls = threading.local()
 worker_sandbox = None  # type: ignore
-worker_loop = asyncio.new_event_loop()
-asyncio.set_event_loop(worker_loop)
 
 
 def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shell", timeout: int = 120):
@@ -35,6 +34,14 @@ def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shel
     if loop is None or loop.is_closed():
         loop = asyncio.new_event_loop()
         _precompile_loop_tls.loop = loop
+    return loop.run_until_complete(sandbox.execute_code(cmd, language=language, timeout=timeout))[0]
+
+
+def _test_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shell", timeout: int = 120):
+    loop = getattr(_test_loop_tls, "loop", None)
+    if loop is None or loop.is_closed():
+        loop = asyncio.new_event_loop()
+        _test_loop_tls.loop = loop
     return loop.run_until_complete(sandbox.execute_code(cmd, language=language, timeout=timeout))[0]
 
 
@@ -95,9 +102,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             f.write(task_args["test_output"])
 
         sandbox = LocalSandbox()
-        compile_result, _ = worker_loop.run_until_complete(
-            sandbox.execute_code(f"cd {unique_dir} && ./compile.sh", language="shell", timeout=120)
-        )
+        compile_result = _test_exec_sync(sandbox, f"cd {unique_dir} && ./compile.sh", language="shell", timeout=120)
         result = {
             "compile_success": not compile_result.get("stderr"),
             "compile_stdout": compile_result.get("stdout", ""),
@@ -111,12 +116,11 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             return result
 
         run_timeout = max(1, int(120 * float(task_args.get("time_scale", 1.0))))
-        run_result, _ = worker_loop.run_until_complete(
-            sandbox.execute_code(
-                f"cd {unique_dir} && export TMPDIR={unique_dir}/tmp && TIME_LIMIT_SCALE={task_args.get('time_scale', 1.0)} ./run.sh",
-                language="shell",
-                timeout=run_timeout,
-            )
+        run_result = _test_exec_sync(
+            sandbox,
+            f"cd {unique_dir} && export TMPDIR={unique_dir}/tmp && TIME_LIMIT_SCALE={task_args.get('time_scale', 1.0)} ./run.sh",
+            language="shell",
+            timeout=run_timeout,
         )
         result["run_stdout"] = run_result.get("stdout", "")
         result["run_stderr"] = run_result.get("stderr", "")
