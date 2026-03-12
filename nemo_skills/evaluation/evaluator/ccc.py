@@ -27,6 +27,7 @@ class CCCEvaluatorConfig(BaseEvaluatorConfig):
 
 _precompile_loop_tls = threading.local()
 _test_loop_tls = threading.local()
+_test_sandbox_tls = threading.local()
 worker_sandbox = None  # type: ignore
 
 
@@ -44,6 +45,14 @@ def _test_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shell",
         loop = asyncio.new_event_loop()
         _test_loop_tls.loop = loop
     return loop.run_until_complete(sandbox.execute_code(cmd, language=language, timeout=timeout))[0]
+
+
+def _get_thread_test_sandbox() -> LocalSandbox:
+    sandbox = getattr(_test_sandbox_tls, "sandbox", None)
+    if sandbox is None:
+        sandbox = LocalSandbox()
+        _test_sandbox_tls.sandbox = sandbox
+    return sandbox
 
 
 def wait_for_sandbox(sandbox, timeout: int = 240, poll: float = 1.0):
@@ -102,7 +111,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         with open(os.path.join(unique_dir, "correct_output.txt"), "w", encoding="utf-8") as f:
             f.write(task_args["test_output"])
 
-        sandbox = LocalSandbox()
+        sandbox = _get_thread_test_sandbox()
         compile_result = _test_exec_sync(sandbox, f"cd {unique_dir} && ./compile.sh", language="shell", timeout=120)
         result = {
             "compile_success": not compile_result.get("stderr"),
