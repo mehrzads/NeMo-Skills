@@ -180,12 +180,12 @@ class CCCMetrics(BaseMetrics):
             "total_max_score": total_max_score,
             "problems": per_problem_report,
             "num_problems": len(per_problem_report),
+            "num_subtasks": sum(problem["num_subtasks"] for problem in per_problem_report),
             "num_submission_rows": total_submission_rows,
             "nonzero_submission_rows": total_nonzero_submission_rows,
             "full_score_submission_rows": total_full_score_submission_rows,
             "problems_fully_solved": problems_fully_solved,
             "problems_sample_fully_solved": problems_sample_fully_solved,
-            "problems_total": len(per_problem_report),
             "problem_solve_rate": (100.0 * problems_fully_solved / len(per_problem_report)) if per_problem_report else 0.0,
             "sample_tests_passed": total_sample_passed,
             "sample_tests_total": total_sample_tests,
@@ -213,14 +213,35 @@ class CCCMetrics(BaseMetrics):
                 if float(report["total_max_score"]).is_integer()
                 else report["total_max_score"]
             )
+            problem_table = []
+            for problem in report["problems"]:
+                ordered_subtasks = list(problem["subtasks"].items())
+                score_array = [
+                    (
+                        int(subtask_info["score"])
+                        if float(subtask_info["score"]).is_integer()
+                        else subtask_info["score"]
+                    )
+                    for _, subtask_info in ordered_subtasks
+                ]
+                problem_table.append(
+                    {
+                        "problem_id": problem["problem_id"],
+                        "name": problem["name"],
+                        "status": "passed" if problem["score"] >= problem["max_score"] and problem["max_score"] > 0 else "failed",
+                        "score": int(problem["score"]) if float(problem["score"]).is_integer() else problem["score"],
+                        "max_score": int(problem["max_score"]) if float(problem["max_score"]).is_integer() else problem["max_score"],
+                        "score_array": score_array,
+                    }
+                )
             summary = {
                 "total_score": total_score,
                 "total_max_score": total_max_score,
                 "problems_fully_solved": report["problems_fully_solved"],
                 "problems_sample_fully_solved": report["problems_sample_fully_solved"],
-                "problems_total": report["problems_total"],
                 "problem_solve_rate": report["problem_solve_rate"],
                 "num_problems": report["num_problems"],
+                "num_subtasks": report["num_subtasks"],
                 "num_submission_rows": report["num_submission_rows"],
                 "nonzero_submission_rows": report["nonzero_submission_rows"],
                 "full_score_submission_rows": report["full_score_submission_rows"],
@@ -230,6 +251,7 @@ class CCCMetrics(BaseMetrics):
                 summary["sample_tests_total"] = report["sample_tests_total"]
                 summary["secret_tests_passed"] = report["secret_tests_passed"]
                 summary["secret_tests_total"] = report["secret_tests_total"]
+            summary["problem_table"] = problem_table
 
             metric.clear()
             metric["summary"] = summary
@@ -237,9 +259,9 @@ class CCCMetrics(BaseMetrics):
             metric["total_max_score"] = total_max_score
             metric["problems_fully_solved"] = report["problems_fully_solved"]
             metric["problems_sample_fully_solved"] = report["problems_sample_fully_solved"]
-            metric["problems_total"] = report["problems_total"]
             metric["problem_solve_rate"] = report["problem_solve_rate"]
             metric["num_problems"] = report["num_problems"]
+            metric["num_subtasks"] = report["num_subtasks"]
             metric["num_submission_rows"] = report["num_submission_rows"]
             metric["nonzero_submission_rows"] = report["nonzero_submission_rows"]
             metric["full_score_submission_rows"] = report["full_score_submission_rows"]
