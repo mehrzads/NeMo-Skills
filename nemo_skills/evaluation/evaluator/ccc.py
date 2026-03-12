@@ -290,6 +290,9 @@ class CCCEvaluator(BaseEvaluator):
             results = await asyncio.gather(*futures)
             for (test_name, _), result in zip(batch, results):
                 result["test_name"] = test_name
+                test_group = problem_metadata["all_tests"][test_name].get("group")
+                if test_group is not None:
+                    result["test_group"] = test_group
                 for subtask_name in test_to_subtasks.get(test_name, []):
                     state = subtask_state[subtask_name]
                     if state["aggregation"] == "min" and state["failed"]:
