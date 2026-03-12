@@ -305,9 +305,24 @@ class CCCEvaluator(BaseEvaluator):
         }
 
     async def eval_full(self, input_files):  # type: ignore[override]
+        await self._initialize_runtime()
+
         for jsonl_file in unroll_files(input_files):
             with open(jsonl_file, "r", encoding="utf-8") as f:
                 all_samples = [json.loads(line) for line in f]
+
+            # Precompile each unique problem once before row-level concurrency starts.
+            unique_problem_ids = []
+            seen_problem_ids = set()
+            for sample in all_samples:
+                problem_id = sample["problem_id"]
+                if problem_id not in seen_problem_ids:
+                    seen_problem_ids.add(problem_id)
+                    unique_problem_ids.append(problem_id)
+
+            for problem_id in unique_problem_ids:
+                await asyncio.to_thread(self._get_precompiled_dir, problem_id, self.metadata[problem_id])
+
             tasks = [self._evaluate_entry(sample) for sample in all_samples]
             outputs = await asyncio.gather(*tasks)
             for sample, output in zip(all_samples, outputs):
