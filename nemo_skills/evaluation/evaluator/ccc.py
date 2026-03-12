@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 import os
 import re
 import shutil
@@ -26,9 +26,8 @@ class CCCEvaluatorConfig(BaseEvaluatorConfig):
 
 
 _precompile_loop_tls = threading.local()
+_test_loop_tls = threading.local()
 worker_sandbox = None  # type: ignore
-worker_loop = asyncio.new_event_loop()
-asyncio.set_event_loop(worker_loop)
 
 
 def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shell", timeout: int = 120):
@@ -39,11 +38,12 @@ def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shel
     return loop.run_until_complete(sandbox.execute_code(cmd, language=language, timeout=timeout))[0]
 
 
-def init_worker():
-    global worker_sandbox, worker_loop
-    worker_sandbox = None
-    worker_loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(worker_loop)
+def _test_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shell", timeout: int = 120):
+    loop = getattr(_test_loop_tls, "loop", None)
+    if loop is None or loop.is_closed():
+        loop = asyncio.new_event_loop()
+        _test_loop_tls.loop = loop
+    return loop.run_until_complete(sandbox.execute_code(cmd, language=language, timeout=timeout))[0]
 
 
 def wait_for_sandbox(sandbox, timeout: int = 240, poll: float = 1.0):
@@ -103,9 +103,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             f.write(task_args["test_output"])
 
         sandbox = LocalSandbox()
-        compile_result, _ = worker_loop.run_until_complete(
-            sandbox.execute_code(f"cd {unique_dir} && ./compile.sh", language="shell", timeout=120)
-        )
+        compile_result = _test_exec_sync(sandbox, f"cd {unique_dir} && ./compile.sh", language="shell", timeout=120)
         result = {
             "compile_success": not compile_result.get("stderr"),
             "compile_stdout": compile_result.get("stdout", ""),
@@ -119,12 +117,11 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             return result
 
         run_timeout = max(1, int(120 * float(task_args.get("time_scale", 1.0))))
-        run_result, _ = worker_loop.run_until_complete(
-            sandbox.execute_code(
-                f"cd {unique_dir} && export TMPDIR={unique_dir}/tmp && TIME_LIMIT_SCALE={task_args.get('time_scale', 1.0)} ./run.sh",
-                language="shell",
-                timeout=run_timeout,
-            )
+        run_result = _test_exec_sync(
+            sandbox,
+            f"cd {unique_dir} && export TMPDIR={unique_dir}/tmp && TIME_LIMIT_SCALE={task_args.get('time_scale', 1.0)} ./run.sh",
+            language="shell",
+            timeout=run_timeout,
         )
         result["run_stdout"] = run_result.get("stdout", "")
         result["run_stderr"] = run_result.get("stderr", "")
@@ -190,10 +187,7 @@ class CCCEvaluator(BaseEvaluator):
                 raise FileNotFoundError(f"Metadata file {self.eval_cfg.test_file} does not exist.")
             with open(self.eval_cfg.test_file, "r", encoding="utf-8") as f:
                 metadata_local = json.load(f)
-            pool_local = multiprocessing.Pool(
-                processes=self.eval_cfg.test_batch_size,
-                initializer=init_worker,
-            )
+            pool_local = ThreadPoolExecutor(max_workers=self.eval_cfg.test_batch_size)
             return sbox, metadata_local, pool_local
 
         self.sandbox, self.metadata, self.pool = await asyncio.to_thread(_setup)
@@ -282,9 +276,9 @@ class CCCEvaluator(BaseEvaluator):
                 tasks.append(self._build_test_task(problem_id, pre_dir, completion, test_data))
             if not batch:
                 continue
-            results = await asyncio.to_thread(
-                self.pool.starmap, run_test_case, [(task, idx) for idx, task in enumerate(tasks)]
-            )
+            loop = asyncio.get_running_loop()
+            futures = [loop.run_in_executor(self.pool, run_test_case, task, idx) for idx, task in enumerate(tasks)]
+            results = await asyncio.gather(*futures)
             for (test_name, _), result in zip(batch, results):
                 result["test_name"] = test_name
                 for subtask_name in test_to_subtasks.get(test_name, []):
@@ -321,8 +315,7 @@ class CCCEvaluator(BaseEvaluator):
             jdump(all_samples, jsonl_file, mode="wt")
 
         if self.pool is not None:
-            self.pool.close()
-            self.pool.join()
+            self.pool.shutdown(wait=True)
 
     async def eval_single(self, data_point: dict):
         return await self._evaluate_entry(data_point)
