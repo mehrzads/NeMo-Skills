@@ -104,11 +104,15 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         os.makedirs(os.path.join(unique_dir, "tmp"), exist_ok=True)
         if precompiled_dir and os.path.isdir(precompiled_dir):
             shutil.copytree(precompiled_dir, unique_dir, dirs_exist_ok=True)
-        with open(os.path.join(unique_dir, "graders", f"{task_args['problem_id']}.cpp"), "w", encoding="utf-8") as f:
-            f.write(task_args["generated_code"])
-        with open(os.path.join(unique_dir, "input.txt"), "w", encoding="utf-8") as f:
+        if task_args.get("task_type") == "SIMULATION":
+            with open(os.path.join(unique_dir, "solution.odo"), "w", encoding="utf-8") as f:
+                f.write(task_args["generated_code"])
+        else:
+            with open(os.path.join(unique_dir, "graders", f"{task_args['problem_id']}.cpp"), "w", encoding="utf-8") as f:
+                f.write(task_args["generated_code"])
+        with open(os.path.join(unique_dir, "input.txt"), "w", encoding="latin1") as f:
             f.write(task_args["test_input"])
-        with open(os.path.join(unique_dir, "correct_output.txt"), "w", encoding="utf-8") as f:
+        with open(os.path.join(unique_dir, "correct_output.txt"), "w", encoding="latin1") as f:
             f.write(task_args["test_output"])
 
         sandbox = _get_thread_test_sandbox()
@@ -151,7 +155,17 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
 def extract_final_cpp_block(text):
     pattern = r"```(?:cpp|Cpp)\s*\n(.*?)```"
     matches = re.findall(pattern, text, re.DOTALL)
-    return matches[-1] if matches else ""
+    return matches[-1] if matches else text
+
+
+def extract_task_config(problem_metadata: dict) -> dict:
+    for relpath, content in problem_metadata.get("grader_files", []):
+        if relpath == "graders/grader_config.json":
+            try:
+                return json.loads(content)
+            except Exception:
+                return {}
+    return {}
 
 
 def add_includes(code: str, problem_header_include: str | None = None, problem_id: str | None = None) -> str:
@@ -216,9 +230,10 @@ class CCCEvaluator(BaseEvaluator):
         self.precompiled_cache[problem_id] = {"grader": grader_dir}
         return grader_dir
 
-    def _build_test_task(self, problem_id: str, pre_dir: str, completion: str, test_data: dict):
+    def _build_test_task(self, problem_id: str, pre_dir: str, completion: str, test_data: dict, task_type: str = "Batch"):
         return {
             "generated_code": completion,
+            "task_type": task_type,
             "problem_id": problem_id,
             "precompiled_dir": pre_dir,
             "test_input": test_data["input"],
@@ -245,11 +260,16 @@ class CCCEvaluator(BaseEvaluator):
 
         problem_id = entry["problem_id"]
         problem_metadata = self.metadata[problem_id]
-        completion = add_includes(
-            extract_final_cpp_block(entry["generation"]),
-            problem_metadata.get("problem_header_include"),
-            problem_id,
-        )
+        task_config = extract_task_config(problem_metadata)
+        task_type = str(task_config.get("task_type", "Batch"))
+        if task_type == "SIMULATION":
+            completion = str(entry["generation"])
+        else:
+            completion = add_includes(
+                extract_final_cpp_block(entry["generation"]),
+                problem_metadata.get("problem_header_include"),
+                problem_id,
+            )
         pre_dir = await asyncio.to_thread(self._get_precompiled_dir, problem_id, problem_metadata)
 
         subtask_state = {
@@ -282,7 +302,7 @@ class CCCEvaluator(BaseEvaluator):
                 if not should_run:
                     continue
                 batch.append((test_name, test_data))
-                tasks.append(self._build_test_task(problem_id, pre_dir, completion, test_data))
+                tasks.append(self._build_test_task(problem_id, pre_dir, completion, test_data, task_type=task_type))
             if not batch:
                 continue
             loop = asyncio.get_running_loop()

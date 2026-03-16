@@ -276,7 +276,17 @@ def run_input_case(task_args: dict, worker_id: int) -> dict:
 def extract_final_cpp_block(text):
     pattern = r"```(?:cpp|Cpp)\s*\n(.*?)```"
     matches = re.findall(pattern, text, re.DOTALL)
-    return matches[-1] if matches else ""
+    return matches[-1] if matches else text
+
+
+def extract_task_config(problem_metadata: dict) -> dict:
+    for relpath, content in problem_metadata.get("grader_files", []):
+        if relpath == "graders/grader_config.json":
+            try:
+                return json.loads(content)
+            except Exception:
+                return {}
+    return {}
 
 
 def add_includes(code: str, problem_id: str) -> str:
@@ -360,8 +370,6 @@ class IOIEvaluator(BaseEvaluator):
     async def _evaluate_entry(self, entry: dict) -> dict:
         # Ensure runtime (sandbox, metadata, pool, etc.) is ready for evaluation.
         await self._initialize_runtime()
-        completion = add_includes(extract_final_cpp_block(entry["generation"]), entry["ioi_id"])
-
         pid = entry["ioi_id"]
 
         # Retrieve helper scripts and grader resources from metadata instead of the dataset entry.
@@ -371,6 +379,12 @@ class IOIEvaluator(BaseEvaluator):
         run_code = subtask_meta["run"]
         grader_files = subtask_meta["grader_files"]
         run_files = subtask_meta.get("run_files", [])
+        task_config = extract_task_config(subtask_meta)
+        task_type = str(task_config.get("task_type", "Batch"))
+        if task_type == "SIMULATION":
+            completion = str(entry["generation"])
+        else:
+            completion = add_includes(extract_final_cpp_block(entry["generation"]), entry["ioi_id"])
 
         if pid not in self.precompiled_cache:
             grader_dir = await asyncio.to_thread(
