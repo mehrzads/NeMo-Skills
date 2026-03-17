@@ -155,7 +155,12 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
 def extract_final_cpp_block(text):
     pattern = r"```(?:cpp|Cpp)\s*\n(.*?)```"
     matches = re.findall(pattern, text, re.DOTALL)
-    return matches[-1] if matches else text
+    return matches[-1] if matches else (text or "")
+
+def extract_final_text_block(text):
+    pattern = r'```(?:txt|text|plain)\s*\n(.*?)```'
+    matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
+    return matches[-1] if matches else (text or "")
 
 
 def extract_task_config(problem_metadata: dict) -> dict:
@@ -247,9 +252,10 @@ class CCCEvaluator(BaseEvaluator):
             if failed:
                 return 0.0
             scores = [float(out.get("score", 0.0)) for out in outputs]
+            precision = max(0, int(subtask_meta.get("score_precision", 0)))
             return round(
                 (min(scores) if scores else 0.0) * float(subtask_meta["score"]),
-                int(subtask_meta.get("score_precision", 0)),
+                precision,
             )
         if aggregation == "sum_tests":
             return float(sum(1 for out in outputs if float(out.get("score", 0.0)) > 0.0))
@@ -263,10 +269,12 @@ class CCCEvaluator(BaseEvaluator):
         task_config = extract_task_config(problem_metadata)
         task_type = str(task_config.get("task_type", "Batch"))
         if task_type == "SIMULATION":
-            completion = str(entry["generation"])
+            completion = extract_final_text_block((entry.get("generation") or ""))
+        elif task_type == "MULTIFILE":
+            completion = extract_final_cpp_block((entry.get("generation") or ""))
         else:
             completion = add_includes(
-                extract_final_cpp_block(entry["generation"]),
+                extract_final_cpp_block((entry.get("generation") or "")),
                 problem_metadata.get("problem_header_include"),
                 problem_id,
             )

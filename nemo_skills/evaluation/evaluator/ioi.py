@@ -276,7 +276,12 @@ def run_input_case(task_args: dict, worker_id: int) -> dict:
 def extract_final_cpp_block(text):
     pattern = r"```(?:cpp|Cpp)\s*\n(.*?)```"
     matches = re.findall(pattern, text, re.DOTALL)
-    return matches[-1] if matches else text
+    return matches[-1] if matches else (text or "")
+
+def extract_final_text_block(text):
+    pattern = r'```(?:txt|text|plain)\s*\n(.*?)```'
+    matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
+    return matches[-1] if matches else (text or "")
 
 
 def extract_task_config(problem_metadata: dict) -> dict:
@@ -382,9 +387,11 @@ class IOIEvaluator(BaseEvaluator):
         task_config = extract_task_config(subtask_meta)
         task_type = str(task_config.get("task_type", "Batch"))
         if task_type == "SIMULATION":
-            completion = str(entry["generation"])
+            completion = extract_final_text_block((entry.get("generation") or ""))
+        elif task_type == "MULTIFILE":
+            completion = extract_final_cpp_block((entry.get("generation") or ""))
         else:
-            completion = add_includes(extract_final_cpp_block(entry["generation"]), entry["ioi_id"])
+            completion = add_includes(extract_final_cpp_block((entry.get("generation") or "")), entry["ioi_id"])
 
         if pid not in self.precompiled_cache:
             grader_dir = await asyncio.to_thread(
@@ -454,7 +461,8 @@ class IOIEvaluator(BaseEvaluator):
 
         test_case_results = {}
         for st, data in subtask_state.items():
-            score = round(min(data["scores"]) * data["score"], data["precision"]) if data["scores"] else 0.0
+            precision = max(0, int(data["precision"]))
+            score = round(min(data["scores"]) * data["score"], precision) if data["scores"] else 0.0
             test_case_results[st] = {"score": score, "outputs": data["outputs"]}
 
         # Optionally run custom input cases
