@@ -41,7 +41,9 @@ class CCCMetrics(BaseMetrics):
             subtask_result = submission.get("test_case_results", {}).get(subtask, {})
             score = float(subtask_result.get("score", 0.0))
             outputs = subtask_result.get("outputs", [])
-            output_max_score = float(len(outputs)) if outputs else float(submission.get("subtask_score", 0.0))
+            # Use the declared subtask score as the scoring maximum.
+            # Counting outputs only works for per-test ICPC tasks and breaks weighted IOI subtasks.
+            output_max_score = float(submission.get("subtask_score", 0.0))
             max_score = max(max_score, output_max_score)
             sample_tests = [out for out in outputs if out.get("test_group") == "sample"]
             secret_tests = [out for out in outputs if out.get("test_group") == "secret"]
