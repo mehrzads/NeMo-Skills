@@ -35,6 +35,8 @@ class CCCMetrics(BaseMetrics):
         sample_total = []
         secret_passed = []
         secret_total = []
+        compile_successes = []
+        compile_attempts = []
         max_score = 0.0
         for submission in submissions[: self.max_k]:
             subtask = submission["subtask"]
@@ -52,6 +54,8 @@ class CCCMetrics(BaseMetrics):
             sample_total.append(len(sample_tests))
             secret_passed.append(sum(1 for out in secret_tests if float(out.get("score", 0.0)) > 0.0))
             secret_total.append(len(secret_tests))
+            compile_successes.append(sum(1 for out in outputs if out.get("compile_success")))
+            compile_attempts.append(len(outputs))
 
         if not scores:
             return {
@@ -61,6 +65,9 @@ class CCCMetrics(BaseMetrics):
                 "sample_tests_total": 0,
                 "secret_tests_passed": 0,
                 "secret_tests_total": 0,
+                "compile_successes": 0,
+                "compile_attempts": 0,
+                "compile_success_rate": 0.0,
                 "submission_stats": {
                     "num_submissions": 0,
                     "min_score": 0.0,
@@ -70,12 +77,18 @@ class CCCMetrics(BaseMetrics):
                     "full_score_submissions": 0,
                     "avg_sample_tests_passed": 0.0,
                     "avg_secret_tests_passed": 0.0,
+                    "avg_compile_successes": 0.0,
+                    "avg_compile_attempts": 0.0,
+                    "avg_compile_success_rate": 0.0,
                 },
             }
 
         agg_score = max(scores) if mode == "best" else sum(scores) / len(scores)
         agg_sample_passed = max(sample_passed) if mode == "best" else sum(sample_passed) / len(sample_passed)
         agg_secret_passed = max(secret_passed) if mode == "best" else sum(secret_passed) / len(secret_passed)
+        agg_compile_successes = max(compile_successes) if mode == "best" else sum(compile_successes) / len(compile_successes)
+        agg_compile_attempts = max(compile_attempts) if mode == "best" else sum(compile_attempts) / len(compile_attempts)
+        agg_compile_success_rate = (100.0 * agg_compile_successes / agg_compile_attempts) if agg_compile_attempts else 0.0
 
         return {
             "score": agg_score,
@@ -84,6 +97,9 @@ class CCCMetrics(BaseMetrics):
             "sample_tests_total": max(sample_total) if sample_total else 0,
             "secret_tests_passed": agg_secret_passed,
             "secret_tests_total": max(secret_total) if secret_total else 0,
+            "compile_successes": agg_compile_successes,
+            "compile_attempts": agg_compile_attempts,
+            "compile_success_rate": agg_compile_success_rate,
             "submission_stats": {
                 "num_submissions": len(scores),
                 "min_score": min(scores),
@@ -93,6 +109,11 @@ class CCCMetrics(BaseMetrics):
                 "full_score_submissions": sum(1 for s in scores if max_score > 0 and s >= max_score),
                 "avg_sample_tests_passed": sum(sample_passed) / len(sample_passed),
                 "avg_secret_tests_passed": sum(secret_passed) / len(secret_passed),
+                "avg_compile_successes": sum(compile_successes) / len(compile_successes),
+                "avg_compile_attempts": sum(compile_attempts) / len(compile_attempts),
+                "avg_compile_success_rate": (
+                    100.0 * sum(compile_successes) / sum(compile_attempts) if sum(compile_attempts) else 0.0
+                ),
             },
         }
 
@@ -107,6 +128,8 @@ class CCCMetrics(BaseMetrics):
         total_submission_rows = 0
         total_nonzero_submission_rows = 0
         total_full_score_submission_rows = 0
+        total_compile_successes = 0.0
+        total_compile_attempts = 0.0
         problems_fully_solved = 0
         problems_sample_fully_solved = 0
 
@@ -129,6 +152,8 @@ class CCCMetrics(BaseMetrics):
             problem_sample_tests = 0
             problem_secret_passed = 0.0
             problem_secret_tests = 0
+            problem_compile_successes = 0.0
+            problem_compile_attempts = 0.0
             problem_submission_rows = sum(s["submission_stats"]["num_submissions"] for s in subtasks.values())
             problem_nonzero_submission_rows = sum(s["submission_stats"]["nonzero_submissions"] for s in subtasks.values())
             problem_full_score_submission_rows = sum(
@@ -145,6 +170,8 @@ class CCCMetrics(BaseMetrics):
                 problem_sample_tests += subtask_report["sample_tests_total"]
                 problem_secret_passed += subtask_report["secret_tests_passed"]
                 problem_secret_tests += subtask_report["secret_tests_total"]
+                problem_compile_successes += subtask_report["compile_successes"]
+                problem_compile_attempts += subtask_report["compile_attempts"]
 
             total_score += problem_score
             total_max_score += problem_max_score
@@ -152,6 +179,8 @@ class CCCMetrics(BaseMetrics):
             total_sample_tests += problem_sample_tests
             total_secret_passed += problem_secret_passed
             total_secret_tests += problem_secret_tests
+            total_compile_successes += problem_compile_successes
+            total_compile_attempts += problem_compile_attempts
             total_submission_rows += problem_submission_rows
             total_nonzero_submission_rows += problem_nonzero_submission_rows
             total_full_score_submission_rows += problem_full_score_submission_rows
@@ -167,6 +196,11 @@ class CCCMetrics(BaseMetrics):
                 "num_submission_rows": problem_submission_rows,
                 "nonzero_submission_rows": problem_nonzero_submission_rows,
                 "full_score_submission_rows": problem_full_score_submission_rows,
+                "compile_successes": problem_compile_successes,
+                "compile_attempts": problem_compile_attempts,
+                "compile_success_rate": (
+                    100.0 * problem_compile_successes / problem_compile_attempts if problem_compile_attempts else 0.0
+                ),
                 "subtasks": subtasks,
             }
             if problem_sample_tests or problem_secret_tests:
@@ -187,6 +221,9 @@ class CCCMetrics(BaseMetrics):
             "num_submission_rows": total_submission_rows,
             "nonzero_submission_rows": total_nonzero_submission_rows,
             "full_score_submission_rows": total_full_score_submission_rows,
+            "compile_successes": total_compile_successes,
+            "compile_attempts": total_compile_attempts,
+            "compile_success_rate": (100.0 * total_compile_successes / total_compile_attempts) if total_compile_attempts else 0.0,
             "problems_fully_solved": problems_fully_solved,
             "problems_sample_fully_solved": problems_sample_fully_solved,
             "problem_solve_rate": (100.0 * problems_fully_solved / len(per_problem_report)) if per_problem_report else 0.0,
@@ -234,6 +271,7 @@ class CCCMetrics(BaseMetrics):
                         "status": "passed" if problem["score"] >= problem["max_score"] and problem["max_score"] > 0 else "failed",
                         "score": int(problem["score"]) if float(problem["score"]).is_integer() else problem["score"],
                         "max_score": int(problem["max_score"]) if float(problem["max_score"]).is_integer() else problem["max_score"],
+                        "compile_success_rate": problem["compile_success_rate"],
                         "score_array": score_array,
                     }
                 )
@@ -248,6 +286,9 @@ class CCCMetrics(BaseMetrics):
                 "num_submission_rows": report["num_submission_rows"],
                 "nonzero_submission_rows": report["nonzero_submission_rows"],
                 "full_score_submission_rows": report["full_score_submission_rows"],
+                "compile_successes": report["compile_successes"],
+                "compile_attempts": report["compile_attempts"],
+                "compile_success_rate": report["compile_success_rate"],
             }
             if report["sample_tests_total"] or report["secret_tests_total"]:
                 summary["sample_tests_passed"] = report["sample_tests_passed"]
@@ -268,6 +309,9 @@ class CCCMetrics(BaseMetrics):
             metric["num_submission_rows"] = report["num_submission_rows"]
             metric["nonzero_submission_rows"] = report["nonzero_submission_rows"]
             metric["full_score_submission_rows"] = report["full_score_submission_rows"]
+            metric["compile_successes"] = report["compile_successes"]
+            metric["compile_attempts"] = report["compile_attempts"]
+            metric["compile_success_rate"] = report["compile_success_rate"]
             if report["sample_tests_total"] or report["secret_tests_total"]:
                 metric["sample_tests_passed"] = report["sample_tests_passed"]
                 metric["sample_tests_total"] = report["sample_tests_total"]
