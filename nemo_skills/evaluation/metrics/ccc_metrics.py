@@ -163,7 +163,18 @@ class CCCMetrics(BaseMetrics):
                     "Each subtask must have a declared subtask_score."
                 )
             subtasks = {}
+            labeled_row_reports = []
             for row_submissions in grouped_rows.values():
+                labeled_subtask = row_submissions[0].get("subtask")
+                if labeled_subtask is not None:
+                    labeled_row_reports.append(
+                        self._aggregate_row_group(
+                            row_submissions,
+                            mode,
+                            subtask_name=labeled_subtask,
+                            declared_max_score=declared_max_by_subtask.get(labeled_subtask),
+                        )
+                    )
                 # Each row has full subtask results in test_case_results.
                 # Score this row against all subtasks, then keep the best row per subtask.
                 row_subtasks = row_submissions[0].get("test_case_results", {}).keys()
@@ -187,11 +198,21 @@ class CCCMetrics(BaseMetrics):
             problem_secret_tests = 0
             problem_compile_successes = 0.0
             problem_compile_attempts = 0.0
-            problem_submission_rows = sum(s["submission_stats"]["num_submissions"] for s in subtasks.values())
-            problem_nonzero_submission_rows = sum(s["submission_stats"]["nonzero_submissions"] for s in subtasks.values())
+            # Row/test counters should be counted once per labeled input row.
+            # Summing per-subtask reports inflates IOI-style problems because the same row
+            # carries test_case_results for many subtasks.
+            problem_submission_rows = len(labeled_row_reports)
+            problem_nonzero_submission_rows = sum(1 for report in labeled_row_reports if report["score"] > 0.0)
             problem_full_score_submission_rows = sum(
-                s["submission_stats"]["full_score_submissions"] for s in subtasks.values()
+                1 for report in labeled_row_reports if report["max_score"] > 0 and report["score"] >= report["max_score"]
             )
+            for row_report in labeled_row_reports:
+                problem_sample_passed += row_report["sample_tests_passed"]
+                problem_sample_tests += row_report["sample_tests_total"]
+                problem_secret_passed += row_report["secret_tests_passed"]
+                problem_secret_tests += row_report["secret_tests_total"]
+                problem_compile_successes += row_report["compile_successes"]
+                problem_compile_attempts += row_report["compile_attempts"]
 
             for subtask_report in subtasks.values():
                 correct = subtask_report["score"] >= subtask_report["max_score"] if subtask_report["max_score"] > 0 else False
@@ -199,12 +220,6 @@ class CCCMetrics(BaseMetrics):
                 problem_score += subtask_report["score"]
                 problem_max_score += subtask_report["max_score"]
                 correct_subtasks += int(correct)
-                problem_sample_passed += subtask_report["sample_tests_passed"]
-                problem_sample_tests += subtask_report["sample_tests_total"]
-                problem_secret_passed += subtask_report["secret_tests_passed"]
-                problem_secret_tests += subtask_report["secret_tests_total"]
-                problem_compile_successes += subtask_report["compile_successes"]
-                problem_compile_attempts += subtask_report["compile_attempts"]
 
             total_score += problem_score
             total_max_score += problem_max_score
