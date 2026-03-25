@@ -144,9 +144,7 @@ class CCCMetrics(BaseMetrics):
             problem_name = submissions[0]["name"]
             grouped_rows = defaultdict(list)
             for submission in submissions:
-                # Row id values are reused across problems and can be ambiguous in some dumps.
-                # Include subtask label for stability while still grouping the same row across rs files.
-                row_key = (submission.get("id"), submission.get("subtask"))
+                row_key = submission.get("id")
                 grouped_rows[row_key].append(submission)
             declared_max_by_subtask = {}
             for submission in submissions:
