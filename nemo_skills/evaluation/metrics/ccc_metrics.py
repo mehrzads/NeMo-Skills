@@ -29,7 +29,7 @@ class CCCMetrics(BaseMetrics):
         normalized = score / max_score if max_score > 0 else 0.0
         return {"correct": 1 if max_score > 0 and score >= max_score else 0, "score": normalized}
 
-    def _aggregate_row_group(self, submissions, mode: str, subtask_name: str):
+    def _aggregate_row_group(self, submissions, mode: str, subtask_name: str, declared_max_score: float | None = None):
         scores = []
         sample_passed = []
         sample_total = []
@@ -44,7 +44,15 @@ class CCCMetrics(BaseMetrics):
             outputs = subtask_result.get("outputs", [])
             # Use the declared subtask score as the scoring maximum.
             # Counting outputs only works for per-test ICPC tasks and breaks weighted IOI subtasks.
-            output_max_score = float(subtask_result.get("max_score", submission.get("subtask_score", 0.0)))
+            if declared_max_score is not None:
+                output_max_score = float(declared_max_score)
+            elif "max_score" in subtask_result:
+                output_max_score = float(subtask_result.get("max_score", 0.0))
+            else:
+                raise ValueError(
+                    f"Max score is undefined for subtask '{subtask_name}'. "
+                    "Expected declared subtask_score or test_case_results[*].max_score."
+                )
             max_score = max(max_score, output_max_score)
             sample_tests = [out for out in outputs if out.get("test_group") == "sample"]
             secret_tests = [out for out in outputs if out.get("test_group") == "secret"]
@@ -136,16 +144,38 @@ class CCCMetrics(BaseMetrics):
             problem_name = submissions[0]["name"]
             grouped_rows = defaultdict(list)
             for submission in submissions:
-                row_id = submission.get("id", f'{problem_id}:{submission["subtask"]}')
-                grouped_rows[row_id].append(submission)
-
+                # Row id values are reused across problems and can be ambiguous in some dumps.
+                # Include subtask label for stability while still grouping the same row across rs files.
+                row_key = (submission.get("id"), submission.get("subtask"))
+                grouped_rows[row_key].append(submission)
+            declared_max_by_subtask = {}
+            for submission in submissions:
+                st = submission.get("subtask")
+                if st is None:
+                    continue
+                declared = float(submission.get("subtask_score", 0.0))
+                declared_max_by_subtask[st] = max(declared_max_by_subtask.get(st, 0.0), declared)
+            all_subtasks = set()
+            for submission in submissions:
+                all_subtasks.update(submission.get("test_case_results", {}).keys())
+            missing_max_subtasks = sorted(st for st in all_subtasks if st not in declared_max_by_subtask)
+            if missing_max_subtasks:
+                raise ValueError(
+                    f"Problem '{problem_id}' has subtasks without defined max score: {missing_max_subtasks}. "
+                    "Each subtask must have a declared subtask_score."
+                )
             subtasks = {}
             for row_submissions in grouped_rows.values():
                 # Each row has full subtask results in test_case_results.
                 # Score this row against all subtasks, then keep the best row per subtask.
-                all_subtasks = row_submissions[0].get("test_case_results", {}).keys()
-                for subtask in all_subtasks:
-                    row_report = self._aggregate_row_group(row_submissions, mode, subtask_name=subtask)
+                row_subtasks = row_submissions[0].get("test_case_results", {}).keys()
+                for subtask in row_subtasks:
+                    row_report = self._aggregate_row_group(
+                        row_submissions,
+                        mode,
+                        subtask_name=subtask,
+                        declared_max_score=declared_max_by_subtask.get(subtask),
+                    )
                     prev = subtasks.get(subtask)
                     if prev is None or row_report["score"] > prev["score"]:
                         subtasks[subtask] = row_report
