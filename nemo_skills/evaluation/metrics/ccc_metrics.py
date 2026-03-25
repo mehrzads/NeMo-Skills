@@ -29,7 +29,7 @@ class CCCMetrics(BaseMetrics):
         normalized = score / max_score if max_score > 0 else 0.0
         return {"correct": 1 if max_score > 0 and score >= max_score else 0, "score": normalized}
 
-    def _aggregate_row_group(self, submissions, mode: str):
+    def _aggregate_row_group(self, submissions, mode: str, subtask_name: str):
         scores = []
         sample_passed = []
         sample_total = []
@@ -39,13 +39,12 @@ class CCCMetrics(BaseMetrics):
         compile_attempts = []
         max_score = 0.0
         for submission in submissions[: self.max_k]:
-            subtask = submission["subtask"]
-            subtask_result = submission.get("test_case_results", {}).get(subtask, {})
+            subtask_result = submission.get("test_case_results", {}).get(subtask_name, {})
             score = float(subtask_result.get("score", 0.0))
             outputs = subtask_result.get("outputs", [])
             # Use the declared subtask score as the scoring maximum.
             # Counting outputs only works for per-test ICPC tasks and breaks weighted IOI subtasks.
-            output_max_score = float(submission.get("subtask_score", 0.0))
+            output_max_score = float(subtask_result.get("max_score", submission.get("subtask_score", 0.0)))
             max_score = max(max_score, output_max_score)
             sample_tests = [out for out in outputs if out.get("test_group") == "sample"]
             secret_tests = [out for out in outputs if out.get("test_group") == "secret"]
@@ -142,8 +141,14 @@ class CCCMetrics(BaseMetrics):
 
             subtasks = {}
             for row_submissions in grouped_rows.values():
-                subtask = row_submissions[0]["subtask"]
-                subtasks[subtask] = self._aggregate_row_group(row_submissions, mode)
+                # Each row has full subtask results in test_case_results.
+                # Score this row against all subtasks, then keep the best row per subtask.
+                all_subtasks = row_submissions[0].get("test_case_results", {}).keys()
+                for subtask in all_subtasks:
+                    row_report = self._aggregate_row_group(row_submissions, mode, subtask_name=subtask)
+                    prev = subtasks.get(subtask)
+                    if prev is None or row_report["score"] > prev["score"]:
+                        subtasks[subtask] = row_report
 
             problem_score = 0.0
             problem_max_score = 0.0
