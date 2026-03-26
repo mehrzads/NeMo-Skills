@@ -8,6 +8,7 @@ import re
 import shutil
 import threading
 import time
+import stat
 from pathlib import Path
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
@@ -29,6 +30,34 @@ _precompile_loop_tls = threading.local()
 _test_loop_tls = threading.local()
 _test_sandbox_tls = threading.local()
 worker_sandbox = None  # type: ignore
+
+
+def _make_tree_read_only(root: str) -> None:
+    for cur_root, dirnames, filenames in os.walk(root):
+        for dirname in dirnames:
+            path = os.path.join(cur_root, dirname)
+            mode = os.stat(path).st_mode
+            os.chmod(path, mode & ~0o222)
+        for filename in filenames:
+            path = os.path.join(cur_root, filename)
+            mode = os.stat(path).st_mode
+            os.chmod(path, mode & ~0o222)
+    root_mode = os.stat(root).st_mode
+    os.chmod(root, root_mode & ~0o222)
+
+
+def _restore_tree_user_writable(root: str) -> None:
+    for cur_root, dirnames, filenames in os.walk(root):
+        for dirname in dirnames:
+            path = os.path.join(cur_root, dirname)
+            mode = os.stat(path).st_mode
+            os.chmod(path, mode | stat.S_IWUSR)
+        for filename in filenames:
+            path = os.path.join(cur_root, filename)
+            mode = os.stat(path).st_mode
+            os.chmod(path, mode | stat.S_IWUSR)
+    root_mode = os.stat(root).st_mode
+    os.chmod(root, root_mode | stat.S_IWUSR)
 
 
 def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shell", timeout: int = 120):
@@ -97,11 +126,11 @@ def _precompile_problem(problem_id: str, grader_files, compile_code: str, run_co
 
 def run_test_case(task_args: dict, worker_id: int) -> dict:
     unique_dir = f"/nemo_run/ccc_run_{worker_id}_{os.getpid()}_{time.time_ns()}"
+    fs_locked = False
     try:
         precompiled_dir = task_args.get("precompiled_dir")
         os.makedirs(unique_dir, exist_ok=True)
         os.makedirs(os.path.join(unique_dir, "graders"), exist_ok=True)
-        os.makedirs(os.path.join(unique_dir, "tmp"), exist_ok=True)
         if precompiled_dir and os.path.isdir(precompiled_dir):
             shutil.copytree(precompiled_dir, unique_dir, dirs_exist_ok=True)
         if task_args.get("task_type") == "SIMULATION":
@@ -129,10 +158,17 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         if not result["compile_success"]:
             return result
 
+        readonly_tmp_dir = os.path.join(unique_dir, "readonly_tmp")
+        os.makedirs(readonly_tmp_dir, exist_ok=True)
+        _make_tree_read_only(unique_dir)
+        fs_locked = True
+
         run_timeout = max(1, int(120 * float(task_args.get("time_scale", 1.0))))
         run_result = _test_exec_sync(
             sandbox,
-            f"cd {unique_dir} && export TMPDIR={unique_dir}/tmp && TIME_LIMIT_SCALE={task_args.get('time_scale', 1.0)} ./run.sh",
+            f"cd {unique_dir} && export TMPDIR={readonly_tmp_dir} TMP={readonly_tmp_dir} TEMP={readonly_tmp_dir} "
+            f"HOME={readonly_tmp_dir} XDG_RUNTIME_DIR={readonly_tmp_dir} "
+            f"TIME_LIMIT_SCALE={task_args.get('time_scale', 1.0)} ./run.sh",
             language="shell",
             timeout=run_timeout,
         )
@@ -147,6 +183,8 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         return {"score": 0.0, "output": "", "error": str(e)}
     finally:
         try:
+            if fs_locked and os.path.isdir(unique_dir):
+                _restore_tree_user_writable(unique_dir)
             shutil.rmtree(unique_dir, ignore_errors=True)
         except Exception:
             pass
