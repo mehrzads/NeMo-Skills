@@ -143,8 +143,8 @@ class CCCMetrics(BaseMetrics):
         for problem_id, submissions in sorted(self.predictions_by_problem.items()):
             problem_name = submissions[0]["name"]
             grouped_rows = defaultdict(list)
-            for submission in submissions:
-                row_key = submission.get("id")
+            for idx, submission in enumerate(submissions):
+                row_key = submission.get("id", f"__row_{idx}")
                 grouped_rows[row_key].append(submission)
             declared_max_by_subtask = {}
             for submission in submissions:
