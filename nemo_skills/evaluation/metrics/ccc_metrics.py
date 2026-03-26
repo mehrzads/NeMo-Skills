@@ -61,8 +61,8 @@ class CCCMetrics(BaseMetrics):
             sample_total.append(len(sample_tests))
             secret_passed.append(sum(1 for out in secret_tests if float(out.get("score", 0.0)) > 0.0))
             secret_total.append(len(secret_tests))
-            compile_successes.append(sum(1 for out in outputs if out.get("compile_success")))
-            compile_attempts.append(len(outputs))
+            compile_successes.append(1 if outputs and any(out.get("compile_success") for out in outputs) else 0)
+            compile_attempts.append(1 if outputs else 0)
 
         if not scores:
             return {
