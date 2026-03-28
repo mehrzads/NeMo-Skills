@@ -1,6 +1,9 @@
 # Copyright (c) 2026, NVIDIA CORPORATION.  All rights reserved.
 
+import json
+import re
 from collections import defaultdict
+from pathlib import Path
 
 from nemo_skills.evaluation.metrics.base import BaseMetrics
 
@@ -8,18 +11,40 @@ from nemo_skills.evaluation.metrics.base import BaseMetrics
 class CCCMetrics(BaseMetrics):
     def __init__(self, **kwargs):
         super().__init__()
+        self.eval_results_dir = None
+        self.random_seeds_by_index = []
         self.reset()
 
     def reset(self):
         super().reset()
         self.predictions_by_problem = defaultdict(list)
+        self._solutions_written = False
+
+    def setup(self, input_files):
+        sorted_files = sorted(str(path) for path in input_files)
+        if sorted_files:
+            self.eval_results_dir = str(Path(sorted_files[0]).resolve().parent)
+        pattern = re.compile(r"output-rs(\d+)\.jsonl$")
+        self.random_seeds_by_index = []
+        for path in sorted_files:
+            match = pattern.search(path)
+            self.random_seeds_by_index.append(int(match.group(1)) if match else None)
 
     def update(self, predictions):
         super().update(predictions)
         self._compute_pass_at_k(predictions)
-        if predictions:
-            problem_id = predictions[0].get("problem_id", predictions[0]["name"])
-            self.predictions_by_problem[problem_id].extend(predictions)
+        if not predictions:
+            return
+
+        annotated_predictions = []
+        for idx, prediction in enumerate(predictions):
+            annotated_prediction = dict(prediction)
+            if idx < len(self.random_seeds_by_index):
+                annotated_prediction["_rs"] = self.random_seeds_by_index[idx]
+            annotated_predictions.append(annotated_prediction)
+
+        problem_id = annotated_predictions[0].get("problem_id", annotated_predictions[0]["name"])
+        self.predictions_by_problem[problem_id].extend(annotated_predictions)
 
     def _get_score_dict(self, submission):
         subtask = submission.get("subtask")
@@ -93,8 +118,11 @@ class CCCMetrics(BaseMetrics):
         agg_score = max(scores) if mode == "best" else sum(scores) / len(scores)
         agg_sample_passed = max(sample_passed) if mode == "best" else sum(sample_passed) / len(sample_passed)
         agg_secret_passed = max(secret_passed) if mode == "best" else sum(secret_passed) / len(secret_passed)
-        agg_compile_successes = max(compile_successes) if mode == "best" else sum(compile_successes) / len(compile_successes)
-        agg_compile_attempts = max(compile_attempts) if mode == "best" else sum(compile_attempts) / len(compile_attempts)
+        # Compile counters should reflect raw execution volume across submissions,
+        # not a best/avg row score. This keeps totals aligned with the number of
+        # evaluated generations that produced outputs for this row.
+        agg_compile_successes = sum(compile_successes)
+        agg_compile_attempts = sum(compile_attempts)
         agg_compile_success_rate = (100.0 * agg_compile_successes / agg_compile_attempts) if agg_compile_attempts else 0.0
 
         return {
@@ -251,6 +279,9 @@ class CCCMetrics(BaseMetrics):
                 ),
                 "subtasks": subtasks,
             }
+            if mode == "best":
+                solution_selection = self._select_minimal_solutions(problem_id, problem_name, submissions, subtasks)
+                problem_report.update(solution_selection)
             if problem_sample_tests or problem_secret_tests:
                 problem_report["sample_tests_passed"] = problem_sample_passed
                 problem_report["sample_tests_total"] = problem_sample_tests
@@ -281,6 +312,163 @@ class CCCMetrics(BaseMetrics):
             "secret_tests_total": total_secret_tests,
         }
 
+    def _select_minimal_solutions(self, problem_id: str, problem_name: str, submissions: list[dict], subtasks: dict):
+        ordered_subtasks = list(subtasks.keys())
+        max_achieved_by_subtask = {subtask: float(report["score"]) for subtask, report in subtasks.items()}
+        active_subtasks = [subtask for subtask, score in max_achieved_by_subtask.items() if score > 0.0]
+        subtask_to_bit = {subtask: idx for idx, subtask in enumerate(active_subtasks)}
+        full_mask = (1 << len(active_subtasks)) - 1
+
+        best_row_by_mask = {}
+        for submission in submissions:
+            if not active_subtasks:
+                break
+
+            test_case_results = submission.get("test_case_results", {})
+            if not isinstance(test_case_results, dict):
+                continue
+
+            achieved_subtask_scores = {}
+            achieved_total_score = 0.0
+            mask = 0
+            for subtask in ordered_subtasks:
+                subtask_result = test_case_results.get(subtask, {})
+                score = 0.0
+                if isinstance(subtask_result, dict):
+                    try:
+                        score = float(subtask_result.get("score", 0.0))
+                    except Exception:
+                        score = 0.0
+                achieved_subtask_scores[subtask] = score
+                if subtask in subtask_to_bit:
+                    achieved_total_score += score
+                    if score >= max_achieved_by_subtask[subtask]:
+                        mask |= 1 << subtask_to_bit[subtask]
+
+            if mask == 0:
+                continue
+
+            rs_value = submission.get("_rs")
+            rs_sort = int(rs_value) if isinstance(rs_value, int) else 10**9
+            row_id = submission.get("id")
+            row_id_sort = row_id if isinstance(row_id, int) else 10**9
+            candidate = {
+                "problem_id": problem_id,
+                "name": problem_name,
+                "rs": rs_value,
+                "id": row_id,
+                "row_subtask": submission.get("subtask") if isinstance(submission.get("subtask"), str) else None,
+                "achieved_total_score": round(achieved_total_score, 6),
+                "achieved_subtask_scores": achieved_subtask_scores,
+                "covers_subtasks": [subtask for subtask in active_subtasks if mask & (1 << subtask_to_bit[subtask])],
+                "solution": submission.get("generation") if isinstance(submission.get("generation"), str) else "",
+            }
+
+            previous = best_row_by_mask.get(mask)
+            candidate_key = (candidate["achieved_total_score"], -rs_sort, -row_id_sort)
+            if previous is None:
+                best_row_by_mask[mask] = candidate
+                continue
+            previous_rs_sort = int(previous["rs"]) if isinstance(previous.get("rs"), int) else 10**9
+            previous_row_id_sort = previous["id"] if isinstance(previous.get("id"), int) else 10**9
+            previous_key = (float(previous["achieved_total_score"]), -previous_rs_sort, -previous_row_id_sort)
+            if candidate_key > previous_key:
+                best_row_by_mask[mask] = candidate
+
+        selected = []
+        candidates = list(best_row_by_mask.items())
+        if full_mask and candidates:
+            dp = {0: (0, 0, tuple())}
+            for idx, (candidate_mask, candidate) in enumerate(candidates):
+                current = dict(dp)
+                candidate_rs = int(candidate["rs"]) if isinstance(candidate.get("rs"), int) else 10**9
+                for current_mask, (count, sum_rs, chosen_indices) in dp.items():
+                    new_mask = current_mask | candidate_mask
+                    state = (count + 1, sum_rs + candidate_rs, chosen_indices + (idx,))
+                    previous = current.get(new_mask)
+                    if previous is None or state < previous:
+                        current[new_mask] = state
+                dp = current
+            if full_mask in dp:
+                selected = [dict(candidates[idx][1]) for idx in dp[full_mask][2]]
+
+        max_achieved_problem_score = round(sum(max_achieved_by_subtask[subtask] for subtask in active_subtasks), 6)
+        return {
+            "max_achieved_problem_score": max_achieved_problem_score,
+            "max_achieved_subtask_scores": max_achieved_by_subtask,
+            "selected_solution_count": len(selected),
+            "combined_selected_score": max_achieved_problem_score,
+            "selected": selected,
+        }
+
+    @staticmethod
+    def _sanitize_filename_component(value):
+        sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value))
+        return sanitized.strip("._") or "unknown"
+
+    @staticmethod
+    def _extract_solution_code(solution_text: str) -> str:
+        matches = re.findall(r"```(?:cpp|c\+\+|cc)?\s*\n(.*?)```", solution_text or "", re.DOTALL | re.IGNORECASE)
+        if matches:
+            return matches[-1].strip() + "\n"
+        return (solution_text or "").rstrip() + "\n"
+
+    def _write_selected_solutions(self, report: dict):
+        if self._solutions_written or not self.eval_results_dir:
+            return
+
+        solutions_dir = Path(self.eval_results_dir) / "solutions"
+        solutions_dir.mkdir(parents=True, exist_ok=True)
+
+        score_report = {
+            "base_path": self.eval_results_dir,
+            "metric_source": f"ccc.pass@{self.max_k}",
+            "problems": [],
+        }
+
+        for problem in report["problems"]:
+            problem_dir = solutions_dir / self._sanitize_filename_component(problem["problem_id"])
+            problem_dir.mkdir(parents=True, exist_ok=True)
+
+            selected_entries = []
+            for solution in problem.get("selected", []):
+                rs_label = f"rs{solution['rs']}" if isinstance(solution.get("rs"), int) else "rs_unknown"
+                row_id = solution.get("id")
+                row_id_label = f"id{row_id}" if row_id is not None else "id_unknown"
+                filename = f"{rs_label}_{row_id_label}.cpp"
+                solution_path = problem_dir / filename
+                solution_path.write_text(self._extract_solution_code(solution.get("solution", "")), encoding="utf-8")
+
+                selected_entry = {
+                    "filename": str(Path(problem["problem_id"]) / filename),
+                    "rs": solution.get("rs"),
+                    "id": solution.get("id"),
+                    "row_subtask": solution.get("row_subtask"),
+                    "achieved_total_score": solution.get("achieved_total_score"),
+                    "achieved_subtask_scores": solution.get("achieved_subtask_scores"),
+                    "covers_subtasks": solution.get("covers_subtasks"),
+                }
+                selected_entries.append(selected_entry)
+
+            score_report["problems"].append(
+                {
+                    "problem_id": problem["problem_id"],
+                    "name": problem["name"],
+                    "max_problem_score": problem["max_score"],
+                    "max_achieved_problem_score": problem.get("max_achieved_problem_score", 0.0),
+                    "max_achieved_subtask_scores": problem.get("max_achieved_subtask_scores", {}),
+                    "selected_solution_count": problem.get("selected_solution_count", 0),
+                    "combined_selected_score": problem.get("combined_selected_score", 0.0),
+                    "selected": selected_entries,
+                }
+            )
+
+        score_report_path = solutions_dir / "solution_scores.json"
+        with open(score_report_path, "w", encoding="utf-8") as fout:
+            json.dump(score_report, fout, indent=2)
+
+        self._solutions_written = True
+
     def get_metrics(self):
         metrics_dict = super().get_metrics()
         keep_keys = [f"pass@1[avg-of-{self.max_k}]", f"pass@{self.max_k}"]
@@ -288,6 +476,7 @@ class CCCMetrics(BaseMetrics):
 
         avg_report = self._build_problem_reports(mode="avg")
         best_report = self._build_problem_reports(mode="best")
+        self._write_selected_solutions(best_report)
         report_by_key = {
             f"pass@1[avg-of-{self.max_k}]": avg_report,
             f"pass@{self.max_k}": best_report,
