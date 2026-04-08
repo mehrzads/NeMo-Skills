@@ -4,10 +4,10 @@ import csv
 import json
 import math
 import os
+import random
 import re
 import sys
 from typing import Dict, Optional, Tuple
-import random
 
 SCORE_A_RE = re.compile(r"(?i)score\s*A\s*:\s*([-+]?\d+(?:\.\d+)?)")
 SCORE_B_RE = re.compile(r"(?i)score\s*B\s*:\s*([-+]?\d+(?:\.\d+)?)")
@@ -17,14 +17,14 @@ JUDGMENT_RE = re.compile(r"(?i)judg(?:e)?ment\s*:\s*(?:\[\s*)?([ab])(?:\s*\])?")
 
 def parse_tail_scores_and_winner(generation_text: str) -> Tuple[float, float, str]:
     # Normalize unicode spaces and remove markdown bold markers to make parsing robust.
-    unicode_spaces = "\u00A0\u202F\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u200B"
+    unicode_spaces = "\u00a0\u202f\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u200b"
     text = str(generation_text)
     for ch in unicode_spaces:
         text = text.replace(ch, " ")
     # Remove markdown asterisks used for bold/italics
     text = text.replace("*", "")
     if text == "":
-        print(f"Empty generation text we will choose random winner and zero scores")
+        print("Empty generation text we will choose random winner and zero scores")
         return 0.0, 0.0, random.choice(["A", "B"])
 
     m_a = SCORE_A_RE.search(text)
@@ -47,9 +47,7 @@ def parse_tail_scores_and_winner(generation_text: str) -> Tuple[float, float, st
 def try_get_numeric(value) -> Optional[float]:
     if value is None:
         return None
-    if isinstance(value, (int, float)) and not (
-        isinstance(value, float) and math.isnan(value)
-    ):
+    if isinstance(value, (int, float)) and not (isinstance(value, float) and math.isnan(value)):
         return float(value)
     # Try numeric string
     if isinstance(value, str):
@@ -60,9 +58,7 @@ def try_get_numeric(value) -> Optional[float]:
     return None
 
 
-def extract_cluster_base_score(
-    obj: dict, side: str, explicit_key: Optional[str]
-) -> Optional[float]:
+def extract_cluster_base_score(obj: dict, side: str, explicit_key: Optional[str]) -> Optional[float]:
     if explicit_key:
         return try_get_numeric(obj.get(explicit_key))
 
@@ -93,9 +89,7 @@ def extract_cluster_base_score(
     return None
 
 
-def extract_cluster_grade(
-    obj: dict, side: str, explicit_key: Optional[str]
-) -> Optional[str]:
+def extract_cluster_grade(obj: dict, side: str, explicit_key: Optional[str]) -> Optional[str]:
     if explicit_key:
         val = obj.get(explicit_key)
         return None if val is None else str(val)
@@ -124,20 +118,14 @@ def main():
     parser = argparse.ArgumentParser(
         description="Aggregate tournament scores and wins per cluster from JSONL matches."
     )
-    parser.add_argument(
-        "input_jsonl", help="Path to the JSONL file (each line is a game)."
-    )
+    parser.add_argument("input_jsonl", help="Path to the JSONL file (each line is a game).")
     parser.add_argument(
         "--output",
         "-o",
         help="Output CSV path. Defaults to input path with .results.csv suffix.",
     )
-    parser.add_argument(
-        "--key-a", help="Explicit key name in JSON for cluster A base score (optional)."
-    )
-    parser.add_argument(
-        "--key-b", help="Explicit key name in JSON for cluster B base score (optional)."
-    )
+    parser.add_argument("--key-a", help="Explicit key name in JSON for cluster A base score (optional).")
+    parser.add_argument("--key-b", help="Explicit key name in JSON for cluster B base score (optional).")
     parser.add_argument(
         "--grade-key-a",
         help="Explicit key name in JSON for cluster A grade (optional).",
@@ -160,11 +148,7 @@ def main():
         print(f"Input file not found: {input_path}", file=sys.stderr)
         sys.exit(2)
 
-    output_path = (
-        os.path.abspath(args.output)
-        if args.output
-        else os.path.splitext(input_path)[0] + ".results.csv"
-    )
+    output_path = os.path.abspath(args.output) if args.output else os.path.splitext(input_path)[0] + ".results.csv"
 
     # stats: (problem_id, cluster) -> {
     #   'tournament_score': float,
@@ -186,7 +170,7 @@ def main():
                 obj = json.loads(raw_line)
             except json.JSONDecodeError as exc:
                 print(
-                    f"Skipping invalid JSON line at record {processed+1}: {exc}",
+                    f"Skipping invalid JSON line at record {processed + 1}: {exc}",
                     file=sys.stderr,
                 )
                 continue
@@ -195,9 +179,7 @@ def main():
             # Prefer 'id', with fallbacks to common alternatives; store as string.
             game_id_val = obj.get(
                 "id",
-                obj.get(
-                    "problem_id", obj.get("question_id", obj.get("ioi_id", "unknown"))
-                ),
+                obj.get("problem_id", obj.get("question_id", obj.get("ioi_id", "unknown"))),
             )
             game_id = str(game_id_val)
 
@@ -210,19 +192,15 @@ def main():
             if solution_id_b is None:
                 solution_id_b = 0
             if not isinstance(a_name, str) or not isinstance(b_name, str):
-                print(
-                    "Skipping line missing cluster_A/cluster_B names.", file=sys.stderr
-                )
+                print("Skipping line missing cluster_A/cluster_B names.", file=sys.stderr)
                 continue
 
             generation_text = obj.get("generation", "")
             try:
-                score_a, score_b, winner = parse_tail_scores_and_winner(
-                    str(generation_text)
-                )
+                score_a, score_b, winner = parse_tail_scores_and_winner(str(generation_text))
             except Exception as exc:
                 print(
-                    f"ERROR: could not parse generation tail for match {processed+1}: {exc} ...{generation_text}",
+                    f"ERROR: could not parse generation tail for match {processed + 1}: {exc} ...{generation_text}",
                     file=sys.stderr,
                 )
                 sys.exit(1)
@@ -289,12 +267,8 @@ def main():
             stats[b_key]["games"] = int(stats[b_key]["games"]) + 1
             stats[b_key]["away"] = int(stats[b_key]["away"]) + 1
 
-            stats[a_key]["tournament_score"] = float(
-                stats[a_key]["tournament_score"]
-            ) + float(score_a)
-            stats[b_key]["tournament_score"] = float(
-                stats[b_key]["tournament_score"]
-            ) + float(score_b)
+            stats[a_key]["tournament_score"] = float(stats[a_key]["tournament_score"]) + float(score_a)
+            stats[b_key]["tournament_score"] = float(stats[b_key]["tournament_score"]) + float(score_b)
 
             if winner == "A":
                 stats[a_key]["wins"] = int(stats[a_key]["wins"]) + 1

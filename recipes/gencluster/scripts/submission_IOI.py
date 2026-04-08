@@ -1,8 +1,9 @@
 import json
+import random
 import sys
 from itertools import cycle
+
 import numpy as np
-import random
 
 max_score_24 = [
     6,
@@ -127,8 +128,6 @@ def apply_blind_cluster_filtering(clusters, strategy="balanced"):
             continue
 
         tokens = [solution.get("tokens", 0) for solution in codes]
-        code_lengths = [len(solution.get("code", "")) for solution in codes]
-
         cluster_stats[cluster_name] = {
             "size": len(codes),
             "avg_tokens": np.mean(tokens) if tokens else 0,
@@ -143,9 +142,7 @@ def apply_blind_cluster_filtering(clusters, strategy="balanced"):
         weights[name] = 0.5 * size_score + 0.5 * token_score
 
     sorted_clusters = sorted(weights.items(), key=lambda x: x[1], reverse=True)
-    final_clusters = [
-        (name, cluster_stats[name]["data"]) for name, _ in sorted_clusters
-    ]
+    final_clusters = [(name, cluster_stats[name]["data"]) for name, _ in sorted_clusters]
 
     return final_clusters
 
@@ -153,9 +150,7 @@ def apply_blind_cluster_filtering(clusters, strategy="balanced"):
 def get_solution_iterator(clusters):
     """Creates an iterator that cycles through clusters first, then solutions within clusters."""
     cluster_names = list(clusters.keys())
-    cluster_iterators = {
-        name: cycle(enumerate(clusters[name]["codes"])) for name in cluster_names
-    }
+    cluster_iterators = {name: cycle(enumerate(clusters[name]["codes"])) for name in cluster_names}
     cluster_cycle = cycle(cluster_names)
 
     def next_solution():
@@ -202,9 +197,7 @@ def run_submission(
     groups_25 = {
         "1-6": list(range(1, 7)),
         "7-12": list(range(7, 13)),  # First part of problem 2 (look at first 6 scores)
-        "13-18": list(
-            range(13, 19)
-        ),  # Second part of problem 2 (look at second 6 scores)
+        "13-18": list(range(13, 19)),  # Second part of problem 2 (look at second 6 scores)
         "19-24": list(range(19, 25)),
         "25-31": list(range(25, 32)),
         "32-33": list(range(32, 34)),
@@ -229,20 +222,14 @@ def run_submission(
 
     print(f"Using dataset: {dataset.upper()} with {len(groups)} problem groups")
     if dataset == "ioi25":
-        print(
-            "  Note: Problem 2 split into '7-12' (first 6 scores) and '13-18' (second 6 scores)"
-        )
+        print("  Note: Problem 2 split into '7-12' (first 6 scores) and '13-18' (second 6 scores)")
     print(f"  Intra-cluster (within-cluster) strategy: {in_cluster_strategy}")
 
     # Initialize a dictionary to store the max score for each subtask of each problem
-    max_scores = {
-        problem_num: [0.0] * len(subtasks) for problem_num, subtasks in groups.items()
-    }
+    max_scores = {problem_num: [0.0] * len(subtasks) for problem_num, subtasks in groups.items()}
 
     # Track which subtasks have reached their maximum possible score
-    completed_subtasks = {
-        problem_num: [False] * len(subtasks) for problem_num, subtasks in groups.items()
-    }
+    completed_subtasks = {problem_num: [False] * len(subtasks) for problem_num, subtasks in groups.items()}
 
     # Track only submissions that improve the final score
     impactful_submissions = []
@@ -264,23 +251,15 @@ def run_submission(
 
         for submission_count in range(50):
             # Filter out completed subtasks
-            available_subtasks = [
-                st
-                for i, st in enumerate(subtasks)
-                if not completed_subtasks[problem_name][i]
-            ]
+            available_subtasks = [st for i, st in enumerate(subtasks) if not completed_subtasks[problem_name][i]]
 
             if not available_subtasks:
-                print(
-                    f"  *** All subtasks in problem {problem_name} have reached maximum score! ***"
-                )
+                print(f"  *** All subtasks in problem {problem_name} have reached maximum score! ***")
                 print(f"  *** Stopping early after {submission_count} submissions ***")
                 break
 
             # Pick a subtask to sample from (cycle through available ones)
-            current_subtask = available_subtasks[
-                submission_count % len(available_subtasks)
-            ]
+            current_subtask = available_subtasks[submission_count % len(available_subtasks)]
 
             # Load cluster data for this subtask if not already cached
             if current_subtask not in clusters_cache:
@@ -307,9 +286,7 @@ def run_submission(
                         clusters = _remove_empty_output_clusters(clusters)
                     # If cluster data is empty or invalid, skip this subtask
                     if not isinstance(clusters, dict) or not clusters:
-                        print(
-                            f"    Cluster data empty for {filepath}, skipping subtask {current_subtask}"
-                        )
+                        print(f"    Cluster data empty for {filepath}, skipping subtask {current_subtask}")
                         if current_subtask in available_subtasks:
                             available_subtasks.remove(current_subtask)
                         continue
@@ -322,9 +299,7 @@ def run_submission(
                             key=lambda item: item[1].get("tournament_wins", 0),
                             reverse=True,
                         )
-                        print(
-                            "    Strategy: wins - sorting clusters by merged tournament_wins (higher first)"
-                        )
+                        print("    Strategy: wins - sorting clusters by merged tournament_wins (higher first)")
                     elif strategy == "score":
                         # Sort by merged tournament_score descending
                         sorted_clusters = sorted(
@@ -332,9 +307,7 @@ def run_submission(
                             key=lambda item: item[1].get("tournament_score", 0.0),
                             reverse=True,
                         )
-                        print(
-                            "    Strategy: score - sorting clusters by merged tournament_score (higher first)"
-                        )
+                        print("    Strategy: score - sorting clusters by merged tournament_score (higher first)")
                     elif strategy == "size":
                         # Sort by cluster size (more codes first)
                         def _codes_len_safe(cdict):
@@ -346,9 +319,7 @@ def run_submission(
                             key=lambda item: _codes_len_safe(item[1]),
                             reverse=True,
                         )
-                        print(
-                            "    Strategy: size - sorting clusters by cluster size (larger first)"
-                        )
+                        print("    Strategy: size - sorting clusters by cluster size (larger first)")
                     elif strategy == "random":
                         # Random order of clusters
                         items = list(clusters.items())
@@ -357,8 +328,7 @@ def run_submission(
                         print("    Strategy: random - shuffling clusters randomly")
                     else:
                         raise ValueError(
-                            f"Unknown inter-cluster strategy: {strategy}. "
-                            "Valid strategies: wins, score, size, random."
+                            f"Unknown inter-cluster strategy: {strategy}. Valid strategies: wins, score, size, random."
                         )
 
                     # Limit clusters if requested
@@ -438,9 +408,7 @@ def run_submission(
 
                     # If no clusters remain after sorting/limiting, skip subtask
                     if not sorted_clusters_dict:
-                        print(
-                            f"    No clusters available after filtering for subtask {current_subtask}"
-                        )
+                        print(f"    No clusters available after filtering for subtask {current_subtask}")
                         if current_subtask in available_subtasks:
                             available_subtasks.remove(current_subtask)
                         continue
@@ -485,18 +453,14 @@ def run_submission(
                     original_subtask_index = len(subtasks) - i - 1
                     subtask_number = subtasks[original_subtask_index]
                     print(f"      New max score for subtask {subtask_number}: {score}")
-                    impacted_details.append(
-                        {"subtask_number": subtask_number, "new_score": score}
-                    )
+                    impacted_details.append({"subtask_number": subtask_number, "new_score": score})
 
                     # Check if this subtask has reached its maximum possible score
                     max_possible = get_max_score_for_subtask(subtask_number, dataset)
                     if max_possible > 0 and score >= max_possible:
                         # Use the original subtask index for consistency with filtering
                         completed_subtasks[problem_name][original_subtask_index] = True
-                        print(
-                            f"      *** Subtask {subtask_number} has reached maximum score! ***"
-                        )
+                        print(f"      *** Subtask {subtask_number} has reached maximum score! ***")
 
             # If this submission improved any subtask, record it
             if impacted_details:
@@ -522,9 +486,7 @@ def run_submission(
         with open(output_path, "w") as f:
             for record in impactful_submissions:
                 f.write(json.dumps(record) + "\n")
-        print(
-            f"Wrote {len(impactful_submissions)} impactful submissions to {output_path}"
-        )
+        print(f"Wrote {len(impactful_submissions)} impactful submissions to {output_path}")
     except Exception as e:
         print(f"Failed to write impactful submissions: {e}")
 
@@ -539,9 +501,7 @@ def run_submission(
     return max_scores
 
 
-def calculate_theoretical_max_score(
-    submission_scores=None, dataset="ioi24", data_subdir=None
-):
+def calculate_theoretical_max_score(submission_scores=None, dataset="ioi24", data_subdir=None):
     """Calculates the theoretical maximum score without the 50-submission limit."""
     groups_24 = {
         "1-7": list(range(1, 8)),
@@ -554,9 +514,7 @@ def calculate_theoretical_max_score(
     groups_25 = {
         "1-6": list(range(1, 7)),
         "7-12": list(range(7, 13)),  # First part of problem 2 (look at first 6 scores)
-        "13-18": list(
-            range(13, 19)
-        ),  # Second part of problem 2 (look at second 6 scores)
+        "13-18": list(range(13, 19)),  # Second part of problem 2 (look at second 6 scores)
         "19-24": list(range(19, 25)),
         "25-31": list(range(25, 32)),
         "32-33": list(range(32, 34)),
@@ -576,17 +534,12 @@ def calculate_theoretical_max_score(
     data_dir = data_subdir if data_subdir else default_dir
 
     # Store original subtasks order for each problem group (before any sorting)
-    original_subtasks_order = {
-        problem_num: subtasks.copy() for problem_num, subtasks in groups.items()
-    }
+    original_subtasks_order = {problem_num: subtasks.copy() for problem_num, subtasks in groups.items()}
 
     # Tracking for cluster files
-    cluster_max_scores = {
-        problem_num: [0.0] * len(subtasks) for problem_num, subtasks in groups.items()
-    }
+    cluster_max_scores = {problem_num: [0.0] * len(subtasks) for problem_num, subtasks in groups.items()}
 
     for problem_name, subtasks in groups.items():
-
         # Check each subtask in the group
         for subtask in subtasks:
             # Try to load cluster file for this subtask
@@ -610,20 +563,16 @@ def calculate_theoretical_max_score(
             # Skip loading individual jsonl files (removed)
 
     # Calculate totals for cluster source
-    total_cluster_max = sum(
-        score for scores in cluster_max_scores.values() for score in scores
-    )
+    total_cluster_max = sum(score for scores in cluster_max_scores.values() for score in scores)
 
     # Comparison table
-    print(f"\n" + "=" * 100)
-    print(f"COMPARISON: CLUSTER vs SUBMISSION vs KNOWN MAX")
-    print(f"=" * 100)
+    print("\n" + "=" * 100)
+    print("COMPARISON: CLUSTER vs SUBMISSION vs KNOWN MAX")
+    print("=" * 100)
     for problem_name, subtasks in groups.items():
         print(f"Problem {problem_name}:")
-        print(
-            f"  {'Subtask':<8} {'Cluster':<8} {'Submission':<10} {'Known Max':<10} {'Status'}"
-        )
-        print(f"  {'-'*8} {'-'*8} {'-'*10} {'-'*10} {'-'*6}")
+        print(f"  {'Subtask':<8} {'Cluster':<8} {'Submission':<10} {'Known Max':<10} {'Status'}")
+        print(f"  {'-' * 8} {'-' * 8} {'-' * 10} {'-' * 10} {'-' * 6}")
         for i, subtask in enumerate(subtasks):
             # For problem groups like '1-7', the grade array is [score_1, score_2, ..., score_7]
             # For problem groups like '9-10', the grade array is [score_9, score_10]
@@ -644,14 +593,12 @@ def calculate_theoretical_max_score(
             submission_ok = "✓" if submission_val >= known_max else "✗"
             status = f"C:{cluster_ok} S:{submission_ok}"
 
-            print(
-                f"  {subtask:<8} {cluster_val:<8} {submission_val:<10} {known_max:<10} {status}"
-            )
+            print(f"  {subtask:<8} {cluster_val:<8} {submission_val:<10} {known_max:<10} {status}")
         print()
 
-    print(f"\n" + "=" * 60)
+    print("\n" + "=" * 60)
     print(f"THEORETICAL MAXIMUM FROM CLUSTER FILES: {total_cluster_max}")
-    print(f"=" * 60)
+    print("=" * 60)
     for problem_name, scores in cluster_max_scores.items():
         print(f"  Problem {problem_name}: {scores}")
 
@@ -659,14 +606,10 @@ def calculate_theoretical_max_score(
 
     # Calculate submission total if available
     if submission_scores:
-        total_submission_score = sum(
-            score for scores in submission_scores.values() for score in scores
-        )
-        print(f"\n" + "=" * 60)
-        print(
-            f"ACTUAL SUBMISSION SCORE (50 submissions limit): {total_submission_score}"
-        )
-        print(f"=" * 60)
+        total_submission_score = sum(score for scores in submission_scores.values() for score in scores)
+        print("\n" + "=" * 60)
+        print(f"ACTUAL SUBMISSION SCORE (50 submissions limit): {total_submission_score}")
+        print("=" * 60)
         for problem_name, scores in submission_scores.items():
             print(f"  Problem {problem_name}: {scores}")
 
@@ -692,19 +635,14 @@ if __name__ == "__main__":
                     sys.exit(1)
                 STRATEGY = strategy
             except IndexError:
-                print(
-                    "Invalid --inter-strategy/--strategy format. "
-                    "Use --inter-strategy=STRATEGY_NAME"
-                )
+                print("Invalid --inter-strategy/--strategy format. Use --inter-strategy=STRATEGY_NAME")
                 sys.exit(1)
         # Cluster selection options
         elif arg.startswith("--max-clusters="):
             try:
                 MAX_CLUSTERS = int(arg.split("=")[1])
             except (IndexError, ValueError):
-                print(
-                    "Invalid --max-clusters value. Use --max-clusters=N (or -1 for all)"
-                )
+                print("Invalid --max-clusters value. Use --max-clusters=N (or -1 for all)")
                 sys.exit(1)
         elif arg in ["--all-clusters", "--all"]:
             MAX_CLUSTERS = -1
@@ -730,22 +668,16 @@ if __name__ == "__main__":
             try:
                 DATA_SUBDIR = arg.split("=")[1]
             except IndexError:
-                print(
-                    "Invalid --data-subdir/--folder format. Use --data-subdir=ioi_25/0"
-                )
+                print("Invalid --data-subdir/--folder format. Use --data-subdir=ioi_25/0")
                 sys.exit(1)
         # Intra-cluster ordering (backwards-compatible alias: --in-cluster-strategy)
-        elif arg.startswith("--intra-strategy=") or arg.startswith(
-            "--in-cluster-strategy="
-        ):
+        elif arg.startswith("--intra-strategy=") or arg.startswith("--in-cluster-strategy="):
             try:
                 IN_CLUSTER_STRATEGY = arg.split("=", 1)[1].lower()
                 allowed_intra = ["longest", "score", "wins", "shortest", "first", "random"]
                 if IN_CLUSTER_STRATEGY not in allowed_intra:
                     print("Invalid --intra-strategy/--in-cluster-strategy.")
-                    print(
-                        "Valid intra strategies: longest, score, wins, shortest, first, random"
-                    )
+                    print("Valid intra strategies: longest, score, wins, shortest, first, random")
                     sys.exit(1)
             except IndexError:
                 print(
@@ -762,18 +694,13 @@ if __name__ == "__main__":
             print("  --ioi25:               Use IOI 2025 dataset")
             print("  --dataset=DATASET:     Specify dataset (ioi24 or ioi25)")
             print("  --data-subdir=PATH     Override data folder, e.g., ioi_25/0")
-            print(
-                "  --clusters-per-subtask=N  Scale cluster limit by #subtasks per problem"
-            )
+            print("  --clusters-per-subtask=N  Scale cluster limit by #subtasks per problem")
             print("Inter-cluster strategy selection (between clusters):")
             print("  wins:    Sort clusters by merged tournament_wins (default)")
             print("  score:   Sort clusters by merged tournament_score")
             print("  size:    Sort clusters by cluster size (#codes)")
             print("  random:  Shuffle clusters randomly")
-            print(
-                "  --inter-strategy=STRATEGY: Explicitly specify inter-cluster strategy "
-                "(alias: --strategy)"
-            )
+            print("  --inter-strategy=STRATEGY: Explicitly specify inter-cluster strategy (alias: --strategy)")
             print("Intra-cluster strategy selection (within a cluster):")
             print("  --intra-strategy=longest   Pick longest solutions first (by tokens)")
             print("  --intra-strategy=shortest  Pick shortest solutions first (by tokens)")
@@ -791,12 +718,10 @@ if __name__ == "__main__":
             sys.exit(1)
         i += 1
 
-    print(f"Configuration:")
+    print("Configuration:")
     print(f"  Dataset: {DATASET.upper()}")
     print(f"  Inter-cluster strategy: {STRATEGY}")
-    print(
-        f"  Max clusters per subtask: {'All' if MAX_CLUSTERS == -1 else MAX_CLUSTERS}"
-    )
+    print(f"  Max clusters per subtask: {'All' if MAX_CLUSTERS == -1 else MAX_CLUSTERS}")
     if "DATA_SUBDIR" in globals():
         print(f"  Data subdir override: {DATA_SUBDIR}")
     if "IN_CLUSTER_STRATEGY" in globals():
@@ -812,6 +737,4 @@ if __name__ == "__main__":
         data_subdir=globals().get("DATA_SUBDIR"),
         in_cluster_strategy=globals().get("IN_CLUSTER_STRATEGY", "longest"),
     )
-    calculate_theoretical_max_score(
-        submission_max_scores, dataset=DATASET, data_subdir=globals().get("DATA_SUBDIR")
-    )
+    calculate_theoretical_max_score(submission_max_scores, dataset=DATASET, data_subdir=globals().get("DATA_SUBDIR"))

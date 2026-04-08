@@ -23,9 +23,7 @@ def wait_for_sandbox(sandbox, loop, timeout: int = 240, poll: float = 1.0):
     deadline = loop.time() + timeout
     while loop.time() < deadline:
         try:
-            result, _ = loop.run_until_complete(
-                sandbox.execute_code("echo hello world", language="shell", timeout=10)
-            )
+            result, _ = loop.run_until_complete(sandbox.execute_code("echo hello world", language="shell", timeout=10))
             if result.get("stdout", "").strip() == "hello world":
                 return
         except Exception:
@@ -48,9 +46,7 @@ def compile_cpp_file(cpp_file_path, binary_dir, sandbox, loop):
     # Compile using gnu++17 similar to evaluators
     compile_cmd = f"g++ -std=gnu++17 -O2 -pipe -s -o {binary_path} {cpp_file}"
     try:
-        result, _ = loop.run_until_complete(
-            sandbox.execute_code(compile_cmd, language="shell", timeout=120)
-        )
+        result, _ = loop.run_until_complete(sandbox.execute_code(compile_cmd, language="shell", timeout=120))
         stderr = result.get("stderr", "")
         if stderr.strip():
             return False, "Compilation failed", stderr
@@ -59,9 +55,7 @@ def compile_cpp_file(cpp_file_path, binary_dir, sandbox, loop):
         return False, "Error", str(e)
 
 
-def process_jsonl_file(
-    jsonl_path, output_dir, binary_dir, folder_name, source_id, sandbox, loop
-):
+def process_jsonl_file(jsonl_path, output_dir, binary_dir, folder_name, source_id, sandbox, loop):
     """Process a single JSONL file; use per-line 'id' to organize outputs."""
     extracted_count = 0
     compiled_count = 0
@@ -100,9 +94,7 @@ def process_jsonl_file(
                             print(f"Skip extract (exists): {relative_path}")
                         else:
                             if cpp_code.strip():
-                                with open(
-                                    output_path, "w", encoding="utf-8"
-                                ) as cpp_file:
+                                with open(output_path, "w", encoding="utf-8") as cpp_file:
                                     cpp_file.write(cpp_code.strip())
                                 extracted_count += 1
                                 print(f"Extracted C++ code to: {relative_path}")
@@ -124,9 +116,7 @@ def process_jsonl_file(
                             compiled_count += 1
                             print("  ✓ Skip compile (exists)")
                         else:
-                            success, status, error_msg = compile_cpp_file(
-                                output_path, binary_type_dir, sandbox, loop
-                            )
+                            success, status, error_msg = compile_cpp_file(output_path, binary_type_dir, sandbox, loop)
                             compilation_results.append(
                                 {
                                     "file": relative_path,
@@ -142,9 +132,7 @@ def process_jsonl_file(
                             else:
                                 print(f"  ✗ Compilation failed: {status}")
                                 if error_msg.strip():
-                                    print(
-                                        f"    Error: {error_msg.strip()[:100]}..."
-                                    )  # First 100 chars
+                                    print(f"    Error: {error_msg.strip()[:100]}...")  # First 100 chars
 
                 except json.JSONDecodeError as e:
                     print(f"Error parsing JSON in {jsonl_path} line {line_num}: {e}")
@@ -198,9 +186,7 @@ def main():
     sandbox = LocalSandbox()
     wait_for_sandbox(sandbox, worker_loop)
     try:
-        result, _ = worker_loop.run_until_complete(
-            sandbox.execute_code("g++ --version", language="shell", timeout=30)
-        )
+        result, _ = worker_loop.run_until_complete(sandbox.execute_code("g++ --version", language="shell", timeout=30))
         if result.get("stderr", "").strip():
             print("✗ g++ not available inside sandbox")
             return
@@ -274,10 +260,7 @@ def main():
     if tasks:
         print(f"\n=== Running {len(tasks)} files with {args.workers} workers ===")
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
-            future_to_task = {
-                executor.submit(_process_file, folder, path): (folder, path)
-                for folder, path in tasks
-            }
+            future_to_task = {executor.submit(_process_file, folder, path): (folder, path) for folder, path in tasks}
             for future in as_completed(future_to_task):
                 rel, extracted, compiled, compilation_results = future.result()
                 print(f"\nProcessing: {rel}")
@@ -290,9 +273,7 @@ def main():
                 failed_in_file = [r for r in compilation_results if not r["success"]]
                 failed_compilations.extend(failed_in_file)
 
-                print(
-                    f"  -> Extracted {extracted} C++ files, compiled {compiled}/{extracted} successfully"
-                )
+                print(f"  -> Extracted {extracted} C++ files, compiled {compiled}/{extracted} successfully")
                 if failed_in_file:
                     print(f"  -> {len(failed_in_file)} compilation failures")
 
@@ -301,11 +282,7 @@ def main():
     print(f"Processed JSONL files: {processed_files}")
     print(f"Total C++ files extracted: {total_extracted}")
     print(f"Total C++ files compiled successfully: {total_compiled}")
-    print(
-        f"Compilation success rate: {total_compiled / total_extracted * 100:.1f}%"
-        if total_extracted > 0
-        else "N/A"
-    )
+    print(f"Compilation success rate: {total_compiled / total_extracted * 100:.1f}%" if total_extracted > 0 else "N/A")
     print("\nDirectory structure:")
     print(f"  {output_dir}/")
     print("    problem_*/")
@@ -344,11 +321,7 @@ def main():
     elapsed = time.time() - start_time
     mm, ss = divmod(int(elapsed), 60)
     hh, mm = divmod(mm, 60)
-    human = (
-        (f"{hh}h {mm}m {ss}s" if hh else f"{mm}m {ss}s")
-        if mm or hh
-        else f"{int(elapsed)}s"
-    )
+    human = (f"{hh}h {mm}m {ss}s" if hh else f"{mm}m {ss}s") if mm or hh else f"{int(elapsed)}s"
     print(f"\nTime spent: {human} ({elapsed:.1f}s)")
 
 

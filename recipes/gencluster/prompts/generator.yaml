@@ -10,6 +10,6 @@ user: |-
 
   ### Question
   {problem}
-  
+
   {input_interactive_instruction}
   ### Answer: (use the provided format with backticks)

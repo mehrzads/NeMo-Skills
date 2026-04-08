@@ -66,12 +66,8 @@ def read_scores_by_problem(csv_path: str, include_solution: bool = False):
             cluster_idx = find_idx(["cluster", "cluster_id", "name"])
             score_idx = find_idx(["tournament_score", "score", "total_score", "points"])
             wins_idx = find_idx(["number_of_wins", "wins", "num_wins", "total_wins"])
-            games_idx = find_idx(
-                ["games", "number_of_games", "matches", "played", "num_games"]
-            )
-            solution_id_idx = find_idx(
-                ["solution_id", "solution_id_a", "solution_id_b"]
-            )
+            games_idx = find_idx(["games", "number_of_games", "matches", "played", "num_games"])
+            solution_id_idx = find_idx(["solution_id", "solution_id_a", "solution_id_b"])
         # Positional fallback for files produced by compute_tournament_score.py:
         # id, solution_id, cluster, cluster_score, tournament_score, number_of_wins, grade, games, home, away
         for row in reader:
@@ -79,11 +75,7 @@ def read_scores_by_problem(csv_path: str, include_solution: bool = False):
                 continue
             try:
                 if has_header:
-                    pid_raw = (
-                        row[id_idx]
-                        if id_idx is not None and id_idx < len(row)
-                        else row[0]
-                    )
+                    pid_raw = row[id_idx] if id_idx is not None and id_idx < len(row) else row[0]
                     cluster_id = (
                         str(row[cluster_idx]).strip()
                         if cluster_idx is not None and cluster_idx < len(row)
@@ -115,9 +107,7 @@ def read_scores_by_problem(csv_path: str, include_solution: bool = False):
                     cluster_id = str(row[2]).strip() if len(row) > 2 else ""
                     score_val = row[4] if len(row) > 4 else "0"
                     wins_val = row[5] if len(row) > 5 else "0"
-                    games_val = (
-                        row[7] if len(row) > 7 else (row[4] if len(row) > 4 else "0")
-                    )
+                    games_val = row[7] if len(row) > 7 else (row[4] if len(row) > 4 else "0")
                 pid = int(str(pid_raw).strip())
             except Exception:
                 continue
@@ -164,9 +154,7 @@ def main():
         type=str,
         help="Path to the CSV containing columns: id, cluster, tournament_score, number_of_wins, games",
     )
-    parser.add_argument(
-        "output_dir", type=str, help="Output directory (e.g., cluster_tournament_100)"
-    )
+    parser.add_argument("output_dir", type=str, help="Output directory (e.g., cluster_tournament_100)")
     parser.add_argument(
         "--intra_cluster",
         action="store_true",
@@ -178,9 +166,7 @@ def main():
     summary = {}
 
     # Load scores by problem id
-    scores_by_problem = read_scores_by_problem(
-        args.tournament_csv, include_solution=args.intra_cluster
-    )
+    scores_by_problem = read_scores_by_problem(args.tournament_csv, include_solution=args.intra_cluster)
 
     # Iterate over all *_cluster.jsonl files in the input directory
     pattern = os.path.join(args.cluster_dir, "*_cluster.jsonl")

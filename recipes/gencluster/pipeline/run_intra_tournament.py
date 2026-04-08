@@ -1,15 +1,10 @@
 import argparse
-import re
-
-from nemo_skills.pipeline.cli import wrap_arguments
-from nemo_skills.pipeline.cli import generate
-from nemo_skills.pipeline.cli import run_cmd
-from nemo_skills.pipeline.utils.cluster import get_cluster_config, cluster_path_exists
-from nemo_skills.pipeline.utils.mounts import get_unmounted_path
 from pathlib import Path
-from typing import Union, Dict
-import os
-import math
+from typing import Dict, Union
+
+from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
+from nemo_skills.pipeline.utils.cluster import cluster_path_exists, get_cluster_config
+from nemo_skills.pipeline.utils.mounts import get_unmounted_path
 
 
 def tournament_schedule_file_exists(
@@ -31,9 +26,7 @@ def tournament_schedule_file_exists(
 
 def main():
     """Main function to run solution generation with benchmark and run number from command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Run solution generation for ICPC benchmark"
-    )
+    parser = argparse.ArgumentParser(description="Run solution generation for ICPC benchmark")
     parser.add_argument(
         "--cluster_folder",
         type=str,
@@ -131,7 +124,6 @@ def main():
     )
     if model == "gpt-oss-120b":
         args_str += "++inference.extra_body.reasoning_effort=high "
-    import os
 
     schedule_dir = cluster_folder + "/intra_schedule/"
     play_dir = cluster_folder + "/play_intra_tournament/"
@@ -140,9 +132,7 @@ def main():
     if filter_enabled:
         cluster_folder = cluster_folder + "/filtered/"
     if stage == "schedule":
-        if tournament_schedule_file_exists(
-            schedule_dir + "/tournament_schedule.jsonl", cluster
-        ):
+        if tournament_schedule_file_exists(schedule_dir + "/tournament_schedule.jsonl", cluster):
             print("Tournament schedule file already exists continuing...")
         else:
             print("Generating tournament schedule...")
@@ -201,7 +191,9 @@ def main():
             genrate_submission_command += f" python /nemo_run/code/gencluster/scripts/submission_ICPC.py --intra-strategy={intra_strategy} --inter-strategy={inter_strategy} --input-dir {cluster_folder}/cluster_with_intra_scores &> {initial_cluster_folder}/submission_intra_cluster_{intra_strategy}_{inter_strategy}_report.txt;"
         else:
             raise ValueError(f"Invalid benchmark: {benchmark}. Expected ioi or icpc")
-        genrate_submission_command += f' else echo "Tournament results file does not exist, please run play_tournament stage first"; exit 1; fi'
+        genrate_submission_command += (
+            ' else echo "Tournament results file does not exist, please run play_tournament stage first"; exit 1; fi'
+        )
         run_cmd(
             ctx=wrap_arguments(""),
             cluster=cluster,

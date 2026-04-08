@@ -24,8 +24,7 @@ def main() -> None:
         "--input_file",
         type=str,
         default="/workspace/llmcoding/eval_dataset/icpc/icpc25.jsonl",
-        help="Path to the input dataset JSONL file "
-        "(default: /workspace/llmcoding/eval_dataset/icpc/icpc25.jsonl)",
+        help="Path to the input dataset JSONL file (default: /workspace/llmcoding/eval_dataset/icpc/icpc25.jsonl)",
     )
     parser.add_argument(
         "--model_name",
@@ -94,9 +93,7 @@ def main() -> None:
         elif model_name == "DeepSeek-V3.2-Speciale":
             server_type = "sglang"
             extra_args_str += (
-                "++inference.endpoint_type=chat "
-                "++chat_template_kwargs.thinking=true "
-                "++inference.top_p=0.95 "
+                "++inference.endpoint_type=chat ++chat_template_kwargs.thinking=true ++inference.top_p=0.95 "
             )
             server_nodes = 2 if cluster in ["iad", "hsg", "dfw"] else 1
             server_args = f"--ep-size {server_gpus * server_nodes} --dp {server_gpus * server_nodes} --enable-dp-attention --mem-fraction-static=0.8 --tool-call-parser deepseekv32 --reasoning-parser deepseek-v3 "

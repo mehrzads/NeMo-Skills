@@ -7,9 +7,7 @@ from typing import Dict, List
 
 def collect_datasets(root_dir: Path):
     if not root_dir.exists() or not root_dir.is_dir():
-        raise FileNotFoundError(
-            f"Root directory not found or not a directory: {root_dir}"
-        )
+        raise FileNotFoundError(f"Root directory not found or not a directory: {root_dir}")
 
     data: Dict[str, List[dict]] = {}
     folder_counts: List[tuple] = []  # (folder_name, count)
@@ -19,9 +17,7 @@ def collect_datasets(root_dir: Path):
         name = p.name
         return (0, int(name)) if name.isdigit() else (1, name)
 
-    subdirs = sorted(
-        [p for p in root_dir.iterdir() if p.is_dir() and p.name.isdigit()], key=sort_key
-    )
+    subdirs = sorted([p for p in root_dir.iterdir() if p.is_dir() and p.name.isdigit()], key=sort_key)
 
     # Create mapping from existing directory numbers to sequential 1-39
     directory_mapping = {}
@@ -34,9 +30,7 @@ def collect_datasets(root_dir: Path):
         mapped_name = directory_mapping[original_name]
 
         # Collect .txt files only, sorted lexicographically to keep a stable order
-        txt_files = sorted(
-            [p for p in subdir.iterdir() if p.is_file() and p.suffix.lower() == ".txt"]
-        )
+        txt_files = sorted([p for p in subdir.iterdir() if p.is_file() and p.suffix.lower() == ".txt"])
 
         # Track counts for reporting later
         folder_counts.append((original_name, len(txt_files)))

@@ -34,9 +34,7 @@ def wait_for_sandbox(sandbox, loop, timeout: int = 240, poll: float = 1.0):
     deadline = loop.time() + timeout
     while loop.time() < deadline:
         try:
-            result, _ = loop.run_until_complete(
-                sandbox.execute_code("echo hello world", language="shell", timeout=10)
-            )
+            result, _ = loop.run_until_complete(sandbox.execute_code("echo hello world", language="shell", timeout=10))
             if result.get("stdout", "").strip() == "hello world":
                 return
         except Exception:
@@ -45,17 +43,13 @@ def wait_for_sandbox(sandbox, loop, timeout: int = 240, poll: float = 1.0):
     raise RuntimeError(f"Sandbox not ready after waiting {timeout}s")
 
 
-def run_generator(
-    gen_binary_path, timeout=10, *, loop=None, sandbox: LocalSandbox = None
-):
+def run_generator(gen_binary_path, timeout=10, *, loop=None, sandbox: LocalSandbox = None):
     """Run a generator binary and return its stdout output"""
     # Prefer sandbox if provided
     if sandbox is not None and loop is not None:
         try:
             cmd = shlex.quote(str(gen_binary_path))
-            result, _ = loop.run_until_complete(
-                sandbox.execute_code(cmd, language="shell", timeout=timeout)
-            )
+            result, _ = loop.run_until_complete(sandbox.execute_code(cmd, language="shell", timeout=timeout))
             if result.get("process_status") == "completed":
                 return True, result.get("stdout", "")
             elif result.get("process_status") == "timeout":
@@ -66,9 +60,7 @@ def run_generator(
             return False, f"Generator error: {str(e)}"
     # Fallback local execution
     try:
-        result = subprocess.run(
-            [str(gen_binary_path)], capture_output=True, text=True, timeout=timeout
-        )
+        result = subprocess.run([str(gen_binary_path)], capture_output=True, text=True, timeout=timeout)
 
         if result.returncode == 0:
             return True, result.stdout
@@ -84,18 +76,14 @@ def run_generator(
         return False, f"Generator error: {str(e)}"
 
 
-def run_generator_to_sandbox_file(
-    gen_binary_path, timeout=10, *, loop=None, sandbox: LocalSandbox = None
-):
+def run_generator_to_sandbox_file(gen_binary_path, timeout=10, *, loop=None, sandbox: LocalSandbox = None):
     """Run generator inside sandbox and write its stdout to a sandbox temp file. Returns (success, sandbox_tmp_path_or_error)."""
     if sandbox is None or loop is None:
         return False, "Sandbox not available"
     try:
         quoted_bin = shlex.quote(str(gen_binary_path))
         script = f'tmp_file=$(mktemp)\n{quoted_bin} > "$tmp_file"\necho "$tmp_file"\n'
-        result, _ = loop.run_until_complete(
-            sandbox.execute_code(script, language="shell", timeout=timeout)
-        )
+        result, _ = loop.run_until_complete(sandbox.execute_code(script, language="shell", timeout=timeout))
         if result.get("process_status") == "timeout":
             return False, "Generator timed out"
         if result.get("process_status") != "completed":
@@ -128,9 +116,7 @@ def run_validator(
                 return "error"
             quoted_in = shlex.quote(input_path_in_sandbox)
             script = f"{quoted_bin} < {quoted_in}\n"
-            result, _ = loop.run_until_complete(
-                sandbox.execute_code(script, language="shell", timeout=timeout)
-            )
+            result, _ = loop.run_until_complete(sandbox.execute_code(script, language="shell", timeout=timeout))
             if result.get("process_status") == "timeout":
                 return "timeout"
             output_lower = result.get("stdout", "").lower().strip()
@@ -221,12 +207,8 @@ def generate_datasets_for_problem(
         print(f"⚠️  Skipping {problem_name}: missing gen or val directory")
         return 0, []
 
-    gen_binaries = [
-        f for f in gen_dir.iterdir() if f.is_file() and os.access(f, os.X_OK)
-    ]
-    val_binaries = [
-        f for f in val_dir.iterdir() if f.is_file() and os.access(f, os.X_OK)
-    ]
+    gen_binaries = [f for f in gen_dir.iterdir() if f.is_file() and os.access(f, os.X_OK)]
+    val_binaries = [f for f in val_dir.iterdir() if f.is_file() and os.access(f, os.X_OK)]
 
     if len(gen_binaries) == 0:
         print(f"⚠️  Skipping {problem_name}: no generator binaries found")
@@ -238,9 +220,7 @@ def generate_datasets_for_problem(
 
     print(f"\n=== Problem {problem_name} ===")
     print(f"Generators: {len(gen_binaries)}, Validators: {len(val_binaries)}")
-    print(
-        f"Target: {n_datasets} datasets (need ≥{min_validators}/{len(val_binaries)} validator approval)"
-    )
+    print(f"Target: {n_datasets} datasets (need ≥{min_validators}/{len(val_binaries)} validator approval)")
 
     # Create output directory for this problem (just the number, not "problem_X")
     problem_number = problem_name.replace("problem_", "")
@@ -272,9 +252,7 @@ def generate_datasets_for_problem(
     active_gens = list(gen_binaries)
 
     if saved_count >= n_datasets:
-        print(
-            f"  ✅ Already have {saved_count}/{n_datasets} datasets – skipping generation for this problem"
-        )
+        print(f"  ✅ Already have {saved_count}/{n_datasets} datasets – skipping generation for this problem")
         return saved_count, generated_datasets
 
     def attempt_generation(gen_path):
@@ -282,11 +260,7 @@ def generate_datasets_for_problem(
         loop, sandbox = _get_thread_context()
         # Early stop check
         with lock:
-            if (
-                saved_count >= n_datasets
-                or attempts >= max_attempts
-                or len(active_gens) == 0
-            ):
+            if saved_count >= n_datasets or attempts >= max_attempts or len(active_gens) == 0:
                 return None
             attempts += 1
             attempt_no = attempts
@@ -296,9 +270,7 @@ def generate_datasets_for_problem(
         gen_ok = False
         sandbox_tmp_path = None
         # Use sandbox temp file to avoid moving data around
-        gen_ok, gen_out = run_generator_to_sandbox_file(
-            gen_path, loop=loop, sandbox=sandbox
-        )
+        gen_ok, gen_out = run_generator_to_sandbox_file(gen_path, loop=loop, sandbox=sandbox)
         if not gen_ok:
             print(f"  ❌ Generator failed: {gen_out}")
             return {
@@ -347,9 +319,7 @@ def generate_datasets_for_problem(
                     )
                 )
                 if mv_res.get("process_status") != "completed":
-                    raise RuntimeError(
-                        mv_res.get("stderr", "Failed to move sandbox file")
-                    )
+                    raise RuntimeError(mv_res.get("stderr", "Failed to move sandbox file"))
             except Exception as e:
                 print(f"  ❌ Failed to move dataset from sandbox: {e}")
                 try:
@@ -401,9 +371,7 @@ def generate_datasets_for_problem(
                 "validation_report": validation_report,
             }
         else:
-            print(
-                f"  ❌ Validation failed: only {passed_count}/{total_validators} validators passed"
-            )
+            print(f"  ❌ Validation failed: only {passed_count}/{total_validators} validators passed")
             print(
                 f"  ⛔ Dropping generator {gen_path.name} due to failed validation, validation_results: {validation_results}"
             )
@@ -430,11 +398,7 @@ def generate_datasets_for_problem(
         futures = set()
         # Seed initial submissions (one per active generator up to capacity)
         gen_it_index = 0
-        while (
-            saved_count < n_datasets
-            and attempts < max_attempts
-            and len(active_gens) > 0
-        ):
+        while saved_count < n_datasets and attempts < max_attempts and len(active_gens) > 0:
             # Top up futures pool
             while (
                 len(futures) < generator_workers
@@ -472,12 +436,8 @@ def generate_datasets_for_problem(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Generate N validated datasets per problem"
-    )
-    parser.add_argument(
-        "n_datasets", type=int, help="Number of datasets to generate per problem"
-    )
+    parser = argparse.ArgumentParser(description="Generate N validated datasets per problem")
+    parser.add_argument("n_datasets", type=int, help="Number of datasets to generate per problem")
     parser.add_argument(
         "--min-validators",
         type=int,
@@ -593,9 +553,7 @@ def main():
     print(f"Problems with datasets: {successful_problems}")
     print(f"Total datasets generated: {total_datasets}")
     print(f"Target datasets: {len(problem_dirs) * args.n_datasets}")
-    print(
-        f"Success rate: {total_datasets / (len(problem_dirs) * args.n_datasets) * 100:.1f}%"
-    )
+    print(f"Success rate: {total_datasets / (len(problem_dirs) * args.n_datasets) * 100:.1f}%")
     print(f"Time taken: {duration:.1f} seconds")
     print(f"Output directory: {output_dir}")
 

@@ -1,10 +1,10 @@
 import argparse
 import json
 import os
-import re
 import random
+import re
 import sys
-from typing import List, Tuple, Set, Dict, Any
+from typing import Any, Dict, List, Set, Tuple
 
 
 def load_clusters(cluster_file: str) -> Dict[str, Any]:
@@ -70,11 +70,7 @@ def compute_cluster_representatives(
             # Handle both "grade" and "score" fields
             grade = s.get("grade", s.get("score", []))
             try:
-                total = (
-                    float(sum(float(x) for x in grade))
-                    if isinstance(grade, list)
-                    else 0.0
-                )
+                total = float(sum(float(x) for x in grade)) if isinstance(grade, list) else 0.0
             except Exception:
                 total = 0.0
             if total > best_sum_grade:
@@ -128,9 +124,7 @@ def load_problem_metadata(problem_number: int, meta_path: str) -> Dict[str, Any]
         return {}
 
 
-def generate_k_regular_simple_graph(
-    num_nodes: int, k: int, rng: random.Random
-) -> List[Tuple[int, int]]:
+def generate_k_regular_simple_graph(num_nodes: int, k: int, rng: random.Random) -> List[Tuple[int, int]]:
     if k >= num_nodes:
         k = num_nodes - 1
     if k < 0:
@@ -139,9 +133,7 @@ def generate_k_regular_simple_graph(
     if (k % 2 == 1) and (num_nodes % 2 == 1):
         k -= 1
     if k < 0:
-        raise ValueError(
-            "Cannot construct non-negative degree graph with given parameters"
-        )
+        raise ValueError("Cannot construct non-negative degree graph with given parameters")
 
     # Try configuration model with rejection to avoid self-loops and multi-edges
     max_attempts = 2000
@@ -181,11 +173,7 @@ def generate_k_regular_simple_graph(
             for u in candidates:
                 if target_deg[u] <= 0:
                     continue
-                vs = [
-                    v
-                    for v in candidates
-                    if v != u and target_deg[v] > 0 and v not in neighbors[u]
-                ]
+                vs = [v for v in candidates if v != u and target_deg[v] > 0 and v not in neighbors[u]]
                 rng.shuffle(vs)
                 added = False
                 for v in vs:
@@ -222,14 +210,10 @@ def generate_k_regular_simple_graph(
                         progress = True
         if all(d == 0 for d in target_deg):
             return sorted(edges)
-    raise RuntimeError(
-        "Failed to generate a uniform schedule; try a different seed or reduce K"
-    )
+    raise RuntimeError("Failed to generate a uniform schedule; try a different seed or reduce K")
 
 
-def generate_k_regular_fast(
-    num_nodes: int, k: int, rng: random.Random
-) -> List[Tuple[int, int]]:
+def generate_k_regular_fast(num_nodes: int, k: int, rng: random.Random) -> List[Tuple[int, int]]:
     """Generate a simple k-regular undirected graph on num_nodes via circulant offsets.
     Conditions: k < num_nodes and k*num_nodes must be even. If not, adjust k downward like legacy.
     """
@@ -274,15 +258,9 @@ def main():
     parser = argparse.ArgumentParser(
         description="Generate a balanced random tournament schedule (K-regular) for clusters in a file."
     )
-    parser.add_argument(
-        "cluster_file", type=str, help="Path to <subtask>_cluster.jsonl"
-    )
-    parser.add_argument(
-        "games_per_cluster", type=int, help="Number of games per cluster (K)"
-    )
-    parser.add_argument(
-        "--seed", type=int, default=42, help="Random seed for reproducibility"
-    )
+    parser.add_argument("cluster_file", type=str, help="Path to <subtask>_cluster.jsonl")
+    parser.add_argument("games_per_cluster", type=int, help="Number of games per cluster (K)")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument(
         "--out",
         type=str,
@@ -312,9 +290,7 @@ def main():
         choices=["longest", "random", "wins"],
         help="How to pick per-cluster representative code",
     )
-    parser.add_argument(
-        "--dataset_path", type=str, default=None, help="Path to the dataset jsonl file"
-    )
+    parser.add_argument("--dataset_path", type=str, default=None, help="Path to the dataset jsonl file")
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
@@ -322,9 +298,7 @@ def main():
     if args.remove_empty:
         clusters = remove_empty_output_clusters(clusters)
     cluster_ids = list(clusters.keys())
-    reps = compute_cluster_representatives(
-        clusters, rng=rng, selection_strategy=args.selection_strategy
-    )
+    reps = compute_cluster_representatives(clusters, rng=rng, selection_strategy=args.selection_strategy)
     problem_number = extract_problem_number_from_cluster_path(args.cluster_file)
     problem_meta = load_problem_metadata(problem_number, args.dataset_path)
     n = len(cluster_ids)
@@ -420,9 +394,7 @@ def main():
                 bar_width = 40
                 filled = int(pct * bar_width / 100)
                 bar = "#" * filled + "-" * (bar_width - filled)
-                sys.stderr.write(
-                    f"\rProgress: [{bar}] {pct}% ({idx + 1}/{total_games})"
-                )
+                sys.stderr.write(f"\rProgress: [{bar}] {pct}% ({idx + 1}/{total_games})")
                 sys.stderr.flush()
     if args.progress:
         sys.stderr.write("\n")

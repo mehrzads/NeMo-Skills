@@ -278,8 +278,9 @@ def extract_final_cpp_block(text):
     matches = re.findall(pattern, text, re.DOTALL)
     return matches[-1] if matches else (text or "")
 
+
 def extract_final_text_block(text):
-    pattern = r'```(?:txt|text|plain)\s*\n(.*?)```'
+    pattern = r"```(?:txt|text|plain)\s*\n(.*?)```"
     matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
     return matches[-1] if matches else (text or "")
 

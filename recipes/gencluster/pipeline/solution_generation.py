@@ -11,18 +11,14 @@ def parse_generation_benchmark(benchmark: str, split: str | None = None) -> tupl
     if benchmark_str.startswith("icpc"):
         match = re.search(r"(\d+)", benchmark_str)
         if not match:
-            raise ValueError(
-                f"Invalid benchmark format: {benchmark}. Expected format like icpc13 or icpc25."
-            )
+            raise ValueError(f"Invalid benchmark format: {benchmark}. Expected format like icpc13 or icpc25.")
         year = int(match.group(1))
         return "icpc", f"icpc{year}", "icpc"
 
     if benchmark_str.startswith("ioi"):
         match = re.search(r"(\d+)", benchmark_str)
         if not match:
-            raise ValueError(
-                f"Invalid benchmark format: {benchmark}. Expected format like ioi20 or ioi25."
-            )
+            raise ValueError(f"Invalid benchmark format: {benchmark}. Expected format like ioi20 or ioi25.")
         year = int(match.group(1))
         return "ioi", f"ioi{year}", f"ioi{year}"
 
@@ -31,16 +27,12 @@ def parse_generation_benchmark(benchmark: str, split: str | None = None) -> tupl
             raise ValueError("CCC generation requires --split, e.g. --benchmark ccc --split ioi25")
         return "ccc", split.strip().lower(), "ccc"
 
-    raise ValueError(
-        f"Invalid benchmark: {benchmark}. Expected icpcYY, ioiYY, or ccc with --split."
-    )
+    raise ValueError(f"Invalid benchmark: {benchmark}. Expected icpcYY, ioiYY, or ccc with --split.")
 
 
 def main():
     """Main function to run solution generation with benchmark and run number from command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Run solution generation for supported coding benchmarks"
-    )
+    parser = argparse.ArgumentParser(description="Run solution generation for supported coding benchmarks")
     parser.add_argument(
         "--benchmark",
         type=str,
@@ -135,7 +127,7 @@ def main():
         type=str,
         default=None,
         help="Override the container image used for the hosted server.",
-    )   
+    )
     parser.add_argument(
         "--prompt_config",
         type=str,
@@ -146,8 +138,7 @@ def main():
         "--test_case_file",
         type=str,
         default=None,
-        help="Path to a JSON file describing generated test cases "
-        "(required if --with_clustering is set)",
+        help="Path to a JSON file describing generated test cases (required if --with_clustering is set)",
     )
     parser.add_argument(
         "--output_dir",
@@ -215,56 +206,15 @@ def main():
     metrics_kwargs = {}
     if with_clustering:
         if not test_case_file:
-            raise ValueError(
-                "Argument --test_case_file is required when --with_clustering is set."
-            )
+            raise ValueError("Argument --test_case_file is required when --with_clustering is set.")
         args_str += f"++eval_config.input_file={test_case_file} "
         cluster_folder = f"{output_dir}/clusters/"
         metrics_kwargs = f'{{"cluster_folder": "{cluster_folder}"}}'
-    if model.lower().startswith("ultra"):       
-        server_gpus = 4
-        server_nodes = 2
-        if server_container is None:
-            server_container = (
-                "/lustre/fsw/portfolios/llmservice/users/dmosallanezh/containers/"
-                "vllm-hsg-03-16.sqsh"
-            )
-        server_args = (
-            "--trust-remote-code "
-            "--dtype bfloat16 "
-            "--kv-cache-dtype fp8 "
-            "--tensor-parallel-size 8 "
-            "--max-num-seqs 256 "
-            "--gpu-memory-utilization 0.95 "
-            "--enable-prefix-caching "
-            "--distributed-executor-backend ray "
-            "--enable-auto-tool-choice "
-            "--tool-call-parser qwen3_coder "
-            "--enable-expert-parallel "
-            "--reasoning-parser-plugin \"/lustre/fsw/portfolios/llmservice/users/lvega/evals/ultra_v3_reasoning_parser.py\" "
-            "--reasoning-parser ultra_v3 "
-            "--mamba_ssm_cache_dtype float32 "
-            "--model-loader-extra-config '{\"enable_multithread_load\":true,\"num_threads\":96}' "
-            "--compilation-config '{\"pass_config\": {\"fuse_allreduce_rms\": false}}' "
-        )
-    elif model.lower().startswith("nemotron-cascade"):  
-         server_args = (
-            "--tensor-parallel-size 8 "
-            "--gpu-memory-utilization 0.9 "
-            "--reasoning-parser-plugin /hf_models/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16/nano_v3_reasoning_parser.py "
-            "--reasoning-parser nano_v3 "
-            "--mamba_ssm_cache_dtype float32 "
-            "--trust-remote-code "            
-        )     
-    elif model == "gpt-oss-120b":
+    if model == "gpt-oss-120b":
         args_str += "++inference.extra_body.reasoning_effort=high "
-    elif model == "Qwen3-32B":
-        server_args += " --rope-scaling '{\\\"rope_type\\\":\\\"yarn\\\",\\\"factor\\\":4.0,\\\"original_max_position_embeddings\\\":32768}' --max-model-len 131072" 
     elif model == "DeepSeek-V3.2-Speciale":
         server_type = "sglang"
-        args_str += (
-            "++inference.endpoint_type=chat " "++chat_template_kwargs.thinking=true "
-        )
+        args_str += "++inference.endpoint_type=chat ++chat_template_kwargs.thinking=true "
         server_nodes = 2 if cluster in ["iad", "hsg", "dfw"] else 1
         server_args = f"--ep-size {server_gpus * server_nodes} --dp {server_gpus * server_nodes} --enable-dp-attention --mem-fraction-static=0.8"
         dependent_jobs = 2

@@ -17,9 +17,9 @@ Rules per problem file (<p>_cluster.jsonl):
 import argparse
 import json
 import os
+import random
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
-import random
 
 
 def to_bool(value: Any) -> bool:
@@ -135,16 +135,12 @@ def build_sorted_clusters(
         items.append((cid, cval))
 
     # Helper: compute SRank per cluster based on outputs overlap and codes size
-    def compute_srank_scores(
-        items_list: List[Tuple[str, Dict[str, Any]]]
-    ) -> Dict[str, int]:
+    def compute_srank_scores(items_list: List[Tuple[str, Dict[str, Any]]]) -> Dict[str, int]:
         outputs_map: Dict[str, List[str]] = {}
         size_map: Dict[str, int] = {}
         for cid, cdict in items_list:
             out_list = cdict.get("output", [])
-            outputs_map[cid] = (
-                [str(x) for x in out_list] if isinstance(out_list, list) else []
-            )
+            outputs_map[cid] = [str(x) for x in out_list] if isinstance(out_list, list) else []
             codes = cdict.get("codes", [])
             size_map[cid] = len(codes) if isinstance(codes, list) else 0
         srank: Dict[str, int] = {}
@@ -166,13 +162,9 @@ def build_sorted_clusters(
 
     # Sort clusters based on inter_strategy
     if inter_strategy == "wins":
-        items.sort(
-            key=lambda kv: to_int(kv[1].get("tournament_wins", 0), 0), reverse=True
-        )
+        items.sort(key=lambda kv: to_int(kv[1].get("tournament_wins", 0), 0), reverse=True)
     elif inter_strategy == "score":
-        items.sort(
-            key=lambda kv: to_int(kv[1].get("tournament_score", 0), 0), reverse=True
-        )
+        items.sort(key=lambda kv: to_int(kv[1].get("tournament_score", 0), 0), reverse=True)
     elif inter_strategy == "size":
 
         def codes_len_safe(cluster_dict: Dict[str, Any]) -> int:
@@ -184,9 +176,7 @@ def build_sorted_clusters(
         random.shuffle(items)
     else:
         # Default fallback to wins
-        items.sort(
-            key=lambda kv: to_int(kv[1].get("tournament_wins", 0), 0), reverse=True
-        )
+        items.sort(key=lambda kv: to_int(kv[1].get("tournament_wins", 0), 0), reverse=True)
     return items
 
 
@@ -311,12 +301,8 @@ def main() -> int:
         if not payload:
             results.append((extract_problem_number(fp.name), -1, -1))
             continue
-        sc = compute_submission_count_for_problem(
-            payload, args.inter_strategy, args.intra_strategy
-        )
-        oc = compute_oracle_inside_cluster_submission_count(
-            payload, args.inter_strategy, args.intra_strategy
-        )
+        sc = compute_submission_count_for_problem(payload, args.inter_strategy, args.intra_strategy)
+        oc = compute_oracle_inside_cluster_submission_count(payload, args.inter_strategy, args.intra_strategy)
         results.append((extract_problem_number(fp.name), sc, oc))
         if sc > 0:
             num_positive += 1
@@ -332,19 +318,11 @@ def main() -> int:
     # Print table
     results.sort(key=lambda x: x[0])
     header_cols = ["Problem", "SubmissionCount", "Oracle inside cluster"]
-    problem_col_width = max(
-        len(header_cols[0]), max((len(str(p)) for p, _, _ in results), default=1)
-    )
-    sc_col_width = max(
-        len(header_cols[1]), max((len(str(sc)) for _, sc, _ in results), default=1)
-    )
-    oc_col_width = max(
-        len(header_cols[2]), max((len(str(oc)) for _, _, oc in results), default=1)
-    )
-    print(
-        f"{header_cols[0]:<{problem_col_width}}  {header_cols[1]:<{sc_col_width}}  {header_cols[2]:<{oc_col_width}}"
-    )
-    print(f"{'-'*problem_col_width}  {'-'*sc_col_width}  {'-'*oc_col_width}")
+    problem_col_width = max(len(header_cols[0]), max((len(str(p)) for p, _, _ in results), default=1))
+    sc_col_width = max(len(header_cols[1]), max((len(str(sc)) for _, sc, _ in results), default=1))
+    oc_col_width = max(len(header_cols[2]), max((len(str(oc)) for _, _, oc in results), default=1))
+    print(f"{header_cols[0]:<{problem_col_width}}  {header_cols[1]:<{sc_col_width}}  {header_cols[2]:<{oc_col_width}}")
+    print(f"{'-' * problem_col_width}  {'-' * sc_col_width}  {'-' * oc_col_width}")
     for p, sc, oc in results:
         print(f"{p:<{problem_col_width}}  {sc:<{sc_col_width}}  {oc:<{oc_col_width}}")
 

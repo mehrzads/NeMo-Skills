@@ -1,10 +1,10 @@
 import argparse
-import os
-import re
 import json
+import os
 import random
-from typing import List, Tuple
+import re
 import sys
+from typing import List, Tuple
 
 import tournament_schedule as ts
 
@@ -17,9 +17,7 @@ def derive_output_path(input_file: str, output_dir: str) -> str:
     return os.path.join(output_dir, derived)
 
 
-def build_directed_edges(
-    n: int, edges: List[Tuple[int, int]], k: int, rng: random.Random
-) -> List[Tuple[int, int]]:
+def build_directed_edges(n: int, edges: List[Tuple[int, int]], k: int, rng: random.Random) -> List[Tuple[int, int]]:
     per_first = [0] * n
     target_first = k // 2
     directed = []
@@ -68,9 +66,7 @@ def build_directed_edges(
     return directed
 
 
-def build_simple_schedule(
-    n: int, games_per_player: int, rng: random.Random
-) -> List[Tuple[int, int]]:
+def build_simple_schedule(n: int, games_per_player: int, rng: random.Random) -> List[Tuple[int, int]]:
     """
     Simple scheduling: each player plays against games_per_player opponents,
     with each matchup played twice (once as A, once as B).
@@ -146,9 +142,7 @@ def write_schedule_jsonl(
                     bar_width = 40
                     filled = int(pct * bar_width / 100)
                     bar = "#" * filled + "-" * (bar_width - filled)
-                    sys.stderr.write(
-                        f"\r[{out_path}] [{bar}] {pct}% ({idx + 1}/{total})"
-                    )
+                    sys.stderr.write(f"\r[{out_path}] [{bar}] {pct}% ({idx + 1}/{total})")
                     sys.stderr.flush()
     if progress:
         sys.stderr.write("\n")
@@ -190,18 +184,10 @@ def write_intracluster_schedule_jsonl(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Run tournament schedules across problems and report line counts."
-    )
-    parser.add_argument(
-        "input_dir", type=str, help="Directory containing <problem>_cluster.jsonl files"
-    )
-    parser.add_argument(
-        "games_per_cluster", type=int, help="Number of games per cluster"
-    )
-    parser.add_argument(
-        "--output-dir", type=str, required=True, help="Output directory for schedules"
-    )
+    parser = argparse.ArgumentParser(description="Run tournament schedules across problems and report line counts.")
+    parser.add_argument("input_dir", type=str, help="Directory containing <problem>_cluster.jsonl files")
+    parser.add_argument("games_per_cluster", type=int, help="Number of games per cluster")
+    parser.add_argument("--output-dir", type=str, required=True, help="Output directory for schedules")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument(
         "--remove-empty",
@@ -220,9 +206,7 @@ def main():
         choices=["longest", "random", "wins"],
         help="How to pick per-cluster representative code",
     )
-    parser.add_argument(
-        "--dataset_path", type=str, default=None, help="Path to the dataset jsonl file"
-    )
+    parser.add_argument("--dataset_path", type=str, default=None, help="Path to the dataset jsonl file")
     parser.add_argument(
         "--intracluster",
         action="store_true",
@@ -241,8 +225,7 @@ def main():
     cluster_files = [
         os.path.join(args.input_dir, f)
         for f in os.listdir(args.input_dir)
-        if f.endswith("_cluster.jsonl")
-        and os.path.isfile(os.path.join(args.input_dir, f))
+        if f.endswith("_cluster.jsonl") and os.path.isfile(os.path.join(args.input_dir, f))
     ]
     if not cluster_files:
         print(f"No *_cluster.jsonl files found in {args.input_dir}")
@@ -263,9 +246,7 @@ def main():
         if args.remove_empty:
             clusters = ts.remove_empty_output_clusters(clusters)
 
-        prob_meta = ts.load_problem_metadata(
-            ts.extract_problem_number_from_cluster_path(in_file), args.dataset_path
-        )
+        prob_meta = ts.load_problem_metadata(ts.extract_problem_number_from_cluster_path(in_file), args.dataset_path)
 
         if args.intracluster:
             # Intra-cluster: schedule games within each cluster
@@ -284,16 +265,10 @@ def main():
                     if args.simple:
                         directed = build_simple_schedule(n, args.games_per_cluster, rng)
                     else:
-                        edges = ts.generate_k_regular_fast(
-                            n, args.games_per_cluster, rng
-                        )
-                        directed = build_directed_edges(
-                            n, edges, args.games_per_cluster, rng
-                        )
+                        edges = ts.generate_k_regular_fast(n, args.games_per_cluster, rng)
+                        directed = build_directed_edges(n, edges, args.games_per_cluster, rng)
 
-                    cnt = write_intracluster_schedule_jsonl(
-                        f, cluster_id, codes, directed, prob_meta
-                    )
+                    cnt = write_intracluster_schedule_jsonl(f, cluster_id, codes, directed, prob_meta)
                     total_games += cnt
 
             totals[p] = total_games
@@ -307,9 +282,7 @@ def main():
                 print(f"skip {p}: not enough clusters ({n})")
                 continue
 
-            reps = ts.compute_cluster_representatives(
-                clusters, rng, selection_strategy=args.selection_strategy
-            )
+            reps = ts.compute_cluster_representatives(clusters, rng, selection_strategy=args.selection_strategy)
             # Generate schedule based on mode
             if args.simple:
                 directed = build_simple_schedule(n, args.games_per_cluster, rng)
@@ -317,9 +290,7 @@ def main():
                 edges = ts.generate_k_regular_fast(n, args.games_per_cluster, rng)
                 directed = build_directed_edges(n, edges, args.games_per_cluster, rng)
             out_path = derive_output_path(in_file, args.output_dir)
-            cnt = write_schedule_jsonl(
-                out_path, cluster_ids, directed, reps, prob_meta, args.progress
-            )
+            cnt = write_schedule_jsonl(out_path, cluster_ids, directed, reps, prob_meta, args.progress)
             totals[p] = cnt
             mode_str = "simple" if args.simple else "k-regular"
             print(f"{p}: {cnt} ({mode_str})")

@@ -24,12 +24,7 @@ def filter_cluster(cluster_data):
         return None
 
     # Filter codes to keep only those with sample_score=True
-    original_count = len(cluster_data["codes"])
-    filtered_codes = [
-        code
-        for code in cluster_data["codes"]
-        if code.get("sample_score", False) == True
-    ]
+    filtered_codes = [code for code in cluster_data["codes"] if code.get("sample_score", False)]
 
     # If no codes remain after filtering, return None (cluster will be removed)
     if not filtered_codes:
@@ -42,9 +37,7 @@ def filter_cluster(cluster_data):
     # Update status field with pass/fail counts
     test_passed = sum(1 for code in filtered_codes if bool(code.get("score", False)))
     test_failed = len(filtered_codes) - test_passed
-    sample_passed = sum(
-        1 for code in filtered_codes if bool(code.get("sample_score", False))
-    )
+    sample_passed = sum(1 for code in filtered_codes if bool(code.get("sample_score", False)))
     sample_failed = len(filtered_codes) - sample_passed
 
     filtered_cluster["status"] = {
@@ -105,9 +98,7 @@ def filter_file(input_file, output_file):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Filter clusters by removing candidates with sample_score=False."
-    )
+    parser = argparse.ArgumentParser(description="Filter clusters by removing candidates with sample_score=False.")
     parser.add_argument(
         "--input-dir",
         type=Path,
@@ -134,9 +125,7 @@ def main():
     print(f"Created output directory: {output_dir}\n")
 
     # Find all cluster files
-    cluster_files = sorted(
-        input_dir.glob("*_cluster.jsonl"), key=lambda x: int(x.stem.split("_")[0])
-    )
+    cluster_files = sorted(input_dir.glob("*_cluster.jsonl"), key=lambda x: int(x.stem.split("_")[0]))
 
     if not cluster_files:
         print(f"Error: No *_cluster.jsonl files found in '{input_dir}'!")
@@ -152,9 +141,7 @@ def main():
     for input_file in cluster_files:
         output_file = output_dir / input_file.name
 
-        orig_clusters, filt_clusters, orig_codes, filt_codes = filter_file(
-            input_file, output_file
-        )
+        orig_clusters, filt_clusters, orig_codes, filt_codes = filter_file(input_file, output_file)
 
         total_original_clusters += orig_clusters
         total_filtered_clusters += filt_clusters
@@ -165,12 +152,8 @@ def main():
         removed_codes = orig_codes - filt_codes
 
         print(f"{input_file.name}:")
-        print(
-            f"  Clusters: {orig_clusters} -> {filt_clusters} (removed {removed_clusters} empty)"
-        )
-        print(
-            f"  Codes:    {orig_codes} -> {filt_codes} (removed {removed_codes} with sample_score=False)"
-        )
+        print(f"  Clusters: {orig_clusters} -> {filt_clusters} (removed {removed_clusters} empty)")
+        print(f"  Codes:    {orig_codes} -> {filt_codes} (removed {removed_codes} with sample_score=False)")
         print()
 
     # Print summary
