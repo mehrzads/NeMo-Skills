@@ -123,7 +123,9 @@ class CCCMetrics(BaseMetrics):
         # evaluated generations that produced outputs for this row.
         agg_compile_successes = sum(compile_successes)
         agg_compile_attempts = sum(compile_attempts)
-        agg_compile_success_rate = (100.0 * agg_compile_successes / agg_compile_attempts) if agg_compile_attempts else 0.0
+        agg_compile_success_rate = (
+            (100.0 * agg_compile_successes / agg_compile_attempts) if agg_compile_attempts else 0.0
+        )
 
         return {
             "score": agg_score,
@@ -232,7 +234,9 @@ class CCCMetrics(BaseMetrics):
             problem_submission_rows = len(labeled_row_reports)
             problem_nonzero_submission_rows = sum(1 for report in labeled_row_reports if report["score"] > 0.0)
             problem_full_score_submission_rows = sum(
-                1 for report in labeled_row_reports if report["max_score"] > 0 and report["score"] >= report["max_score"]
+                1
+                for report in labeled_row_reports
+                if report["max_score"] > 0 and report["score"] >= report["max_score"]
             )
             for row_report in labeled_row_reports:
                 problem_sample_passed += row_report["sample_tests_passed"]
@@ -243,7 +247,11 @@ class CCCMetrics(BaseMetrics):
                 problem_compile_attempts += row_report["compile_attempts"]
 
             for subtask_report in subtasks.values():
-                correct = subtask_report["score"] >= subtask_report["max_score"] if subtask_report["max_score"] > 0 else False
+                correct = (
+                    subtask_report["score"] >= subtask_report["max_score"]
+                    if subtask_report["max_score"] > 0
+                    else False
+                )
                 subtask_report["correct"] = correct
                 problem_score += subtask_report["score"]
                 problem_max_score += subtask_report["max_score"]
@@ -287,7 +295,9 @@ class CCCMetrics(BaseMetrics):
                 problem_report["sample_tests_total"] = problem_sample_tests
                 problem_report["secret_tests_passed"] = problem_secret_passed
                 problem_report["secret_tests_total"] = problem_secret_tests
-                problem_report["sample_fully_solved"] = problem_sample_tests > 0 and problem_sample_passed >= problem_sample_tests
+                problem_report["sample_fully_solved"] = (
+                    problem_sample_tests > 0 and problem_sample_passed >= problem_sample_tests
+                )
                 problems_sample_fully_solved += int(problem_report["sample_fully_solved"])
             per_problem_report.append(problem_report)
 
@@ -302,10 +312,14 @@ class CCCMetrics(BaseMetrics):
             "full_score_submission_rows": total_full_score_submission_rows,
             "compile_successes": total_compile_successes,
             "compile_attempts": total_compile_attempts,
-            "compile_success_rate": (100.0 * total_compile_successes / total_compile_attempts) if total_compile_attempts else 0.0,
+            "compile_success_rate": (100.0 * total_compile_successes / total_compile_attempts)
+            if total_compile_attempts
+            else 0.0,
             "problems_fully_solved": problems_fully_solved,
             "problems_sample_fully_solved": problems_sample_fully_solved,
-            "problem_solve_rate": (100.0 * problems_fully_solved / len(per_problem_report)) if per_problem_report else 0.0,
+            "problem_solve_rate": (100.0 * problems_fully_solved / len(per_problem_report))
+            if per_problem_report
+            else 0.0,
             "sample_tests_passed": total_sample_passed,
             "sample_tests_total": total_sample_tests,
             "secret_tests_passed": total_secret_passed,
@@ -484,7 +498,9 @@ class CCCMetrics(BaseMetrics):
 
         for key, metric in metrics_dict.items():
             report = report_by_key[key]
-            total_score = int(report["total_score"]) if float(report["total_score"]).is_integer() else report["total_score"]
+            total_score = (
+                int(report["total_score"]) if float(report["total_score"]).is_integer() else report["total_score"]
+            )
             total_max_score = (
                 int(report["total_max_score"])
                 if float(report["total_max_score"]).is_integer()
@@ -505,9 +521,13 @@ class CCCMetrics(BaseMetrics):
                     {
                         "problem_id": problem["problem_id"],
                         "name": problem["name"],
-                        "status": "passed" if problem["score"] >= problem["max_score"] and problem["max_score"] > 0 else "failed",
+                        "status": "passed"
+                        if problem["score"] >= problem["max_score"] and problem["max_score"] > 0
+                        else "failed",
                         "score": int(problem["score"]) if float(problem["score"]).is_integer() else problem["score"],
-                        "max_score": int(problem["max_score"]) if float(problem["max_score"]).is_integer() else problem["max_score"],
+                        "max_score": int(problem["max_score"])
+                        if float(problem["max_score"]).is_integer()
+                        else problem["max_score"],
                         "compile_success_rate": problem["compile_success_rate"],
                         "score_array": score_array,
                     }

@@ -2,13 +2,12 @@
 
 import asyncio
 import json
-from concurrent.futures import ThreadPoolExecutor
 import os
 import re
 import shutil
 import threading
 import time
-from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
 from nemo_skills.evaluation.evaluator.base import BaseEvaluator, BaseEvaluatorConfig
@@ -108,7 +107,9 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             with open(os.path.join(unique_dir, "solution.odo"), "w", encoding="utf-8") as f:
                 f.write(task_args["generated_code"])
         else:
-            with open(os.path.join(unique_dir, "graders", f"{task_args['problem_id']}.cpp"), "w", encoding="utf-8") as f:
+            with open(
+                os.path.join(unique_dir, "graders", f"{task_args['problem_id']}.cpp"), "w", encoding="utf-8"
+            ) as f:
                 f.write(task_args["generated_code"])
         with open(os.path.join(unique_dir, "input.txt"), "w", encoding="latin1") as f:
             f.write(task_args["test_input"])
@@ -157,8 +158,9 @@ def extract_final_cpp_block(text):
     matches = re.findall(pattern, text, re.DOTALL)
     return matches[-1] if matches else (text or "")
 
+
 def extract_final_text_block(text):
-    pattern = r'```(?:txt|text|plain)\s*\n(.*?)```'
+    pattern = r"```(?:txt|text|plain)\s*\n(.*?)```"
     matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
     return matches[-1] if matches else (text or "")
 
@@ -235,7 +237,9 @@ class CCCEvaluator(BaseEvaluator):
         self.precompiled_cache[problem_id] = {"grader": grader_dir}
         return grader_dir
 
-    def _build_test_task(self, problem_id: str, pre_dir: str, completion: str, test_data: dict, task_type: str = "Batch"):
+    def _build_test_task(
+        self, problem_id: str, pre_dir: str, completion: str, test_data: dict, task_type: str = "Batch"
+    ):
         return {
             "generated_code": completion,
             "task_type": task_type,
@@ -336,7 +340,6 @@ class CCCEvaluator(BaseEvaluator):
                 "score": self._aggregate_subtask_score(subtask_meta, state["outputs"], failed=state["failed"]),
                 "outputs": state["outputs"],
             }
-
 
         return {
             "name": entry["name"],
